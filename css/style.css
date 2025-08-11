@@ -1,0 +1,305 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    color: #333;
+    font-size: 2.5em;
+}
+
+.controls {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.bubble-controls {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    display: none; /* Hidden by default, shown after image upload */
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.control-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.add-btn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.add-btn:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+}
+
+.copy-btn {
+    background-color: #2196F3;
+    color: white;
+}
+
+.copy-btn:hover:not(:disabled) {
+    background-color: #1976D2;
+    transform: translateY(-1px);
+}
+
+.copy-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.export-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.export-format {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.export-format:focus {
+    outline: none;
+    border-color: #FF9800;
+}
+
+.export-btn {
+    background-color: #FF9800;
+    color: white;
+}
+
+.export-btn:hover:not(:disabled) {
+    background-color: #F57C00;
+    transform: translateY(-1px);
+}
+
+.export-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.delete-btn {
+    background-color: #f44336;
+    color: white;
+}
+
+.delete-btn:hover:not(:disabled) {
+    background-color: #da190b;
+    transform: translateY(-1px);
+}
+
+.delete-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.bubble-count {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+    padding: 8px 15px;
+    background-color: #e8f5e8;
+    border-radius: 20px;
+    border: 1px solid #4CAF50;
+}
+
+#imageUpload {
+    display: none;
+}
+
+.upload-btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.upload-btn:hover {
+    background-color: #45a049;
+}
+
+.editor-area {
+    display: flex;
+    justify-content: center;
+}
+
+#canvas-container {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    min-width: 600px;
+    min-height: 400px;
+    position: relative;
+    background-color: white;
+    overflow: visible;
+}
+
+#upload-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+    font-size: 18px;
+}
+
+#background-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    user-select: none; /* Prevent image selection */
+}
+
+/* Speech Bubble Styles */
+.speech-bubble {
+    position: absolute;
+    z-index: 10;
+    pointer-events: all;
+    user-select: none; /* Prevent text selection during drag */
+    transition: opacity 0.1s ease;
+}
+
+.speech-bubble svg {
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Allow click events to pass through to container */
+}
+
+/* Resize Handle Styles */
+.resize-handles {
+    position: absolute;
+    pointer-events: none;
+    z-index: 200;
+}
+
+.resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: #4CAF50;
+    border: 1px solid #333;
+    border-radius: 2px;
+    pointer-events: all;
+    transition: background-color 0.2s ease;
+}
+
+.resize-handle:hover {
+    background-color: #45a049;
+    transform: scale(1.1);
+}
+
+.resize-handle-nw {
+    cursor: nw-resize;
+    left: -4px;
+    top: -4px;
+}
+
+.resize-handle-ne {
+    cursor: ne-resize;
+    right: -4px;
+    top: -4px;
+}
+
+.resize-handle-sw {
+    cursor: sw-resize;
+    left: -4px;
+    bottom: -4px;
+}
+
+.resize-handle-se {
+    cursor: se-resize;
+    right: -4px;
+    bottom: -4px;
+}
+
+/* Visual feedback for selected bubbles */
+.speech-bubble:hover {
+    opacity: 0.9;
+}
+
+/* Rotation Handle Styles */
+.rotation-handle-container {
+    position: absolute;
+    pointer-events: none;
+    z-index: 201;
+}
+
+.rotation-line {
+    position: absolute;
+    background-color: #4CAF50;
+    pointer-events: none;
+}
+
+.rotation-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background-color: #FF6B6B;
+    border: 1px solid #333;
+    border-radius: 50%;
+    cursor: crosshair;
+    pointer-events: all;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.rotation-handle:hover {
+    background-color: #FF5252;
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Prevent text selection during drag operations */
+.no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}

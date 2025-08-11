@@ -1,0 +1,152 @@
+﻿# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Browser testing
+screenshots/
+test-results/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Speech Bubble Editor .gitignore
+
+# Auto-generated project files
+directory_structure_and_content.txt
+Collect_repo.ps1
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+
+# Node.js (for future use)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log*
+
+# Build artifacts and dist folders
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# Environment and configuration files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# User uploads and test files
+uploads/
+test-images/
+sample-images/
+user-content/
+
+# Export and output files
+exports/
+output/
+generated/
+*.png.bak
+*.jpg.bak
+*.jpeg.bak
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Temporary files
+.tmp/
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Browser testing artifacts
+.selenium/
+screenshots/
+test-results/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# CSS and JS maps (if using build tools later)
+*.css.map
+*.js.map
+
+# Compressed files (unless specifically needed)
+*.zip
+*.tar.gz
+*.rar
+
+# Documentation build
+docs/_build/
+
+# Local development server files
+.serve/

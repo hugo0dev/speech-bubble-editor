@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Bubble Editor</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script type="module">
+        import { encode as encodeAVIF } from 'https://unpkg.com/@jsquash/avif?module';
+        window.jSquashAVIF = { encode: encodeAVIF };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Speech Bubble Editor</h1>
+            <p class="version-info">Modular Version with Control Points</p>
+        </header>
+        
+        <div class="controls">
+            <input type="file" id="imageUpload" accept="image/*" />
+            <label for="imageUpload" class="upload-btn">Upload Image</label>
+        </div>
+        
+        <div class="bubble-controls" id="bubbleControls" style="display: none;">
+            <button id="addBubbleBtn" class="control-btn add-btn">Add Speech Bubble</button>
+            <button id="copyBubbleBtn" class="control-btn copy-btn" disabled>Copy Selected (Ctrl+D)</button>
+            <button id="deleteBubbleBtn" class="control-btn delete-btn" disabled>Delete Selected (Del)</button>
+            <div class="export-controls">
+                <button id="exportImageBtn" class="control-btn export-btn">Export Image</button>
+                <select id="exportFormat" class="export-format">
+                    <option value="avif">AVIF</option>
+                    <option value="webp">WebP</option>
+                    <option value="jpeg-high">JPEG High Quality</option>
+                    <option value="jpeg-medium">JPEG Medium Quality</option>
+                    <option value="png">PNG</option>
+                </select>
+            </div>
+            <span class="bubble-count" id="bubbleCount">Bubbles: 0</span>
+        </div>
+        
+        <div class="editor-area">
+            <div id="canvas-container">
+                <div id="upload-placeholder">
+                    <p>Upload an image to get started</p>
+                    <p class="feature-info">✨ Control Point Deformation Ready!</p>
+                </div>
+                <img id="background-image" style="display: none;" />
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load modules in dependency order -->
+    <!-- 1. Constants and utilities first -->
+    <script src="js/utils/Constants.js"></script>
+    
+    <!-- 2. Core infrastructure modules -->
+    <script src="js/core/ErrorHandler.js"></script>
+    <script src="js/core/AppCoordinator.js"></script>
+    
+    <!-- 3. Controller modules -->
+    <script src="js/controllers/UIController.js"></script>
+    <script src="js/controllers/ImageController.js"></script>
+    
+    <!-- 4. Manager modules (existing) -->
+    <script src="js/managers/ControlPointManager.js"></script>
+    <script src="js/managers/HandleManager.js"></script>
+    <script src="js/managers/BubbleManager.js"></script>
+    <script src="js/managers/InteractionManager.js"></script>
+    
+    <!-- 5. Main coordination class (lightweight entry point) -->
+    <script src="js/main.js"></script>
+</body>
+</html>
