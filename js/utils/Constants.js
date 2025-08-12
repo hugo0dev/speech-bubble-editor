@@ -1,17 +1,15 @@
 /**
- * Constants and Configuration for Speech Bubble Editor
+ * Constants for Speech Bubble Editor
  */
 class Constants {
-    // Default bubble dimensions
+    // Bubble dimensions
     static DEFAULT_BUBBLE_WIDTH = 150;
     static DEFAULT_BUBBLE_HEIGHT = 112;
     static DEFAULT_BUBBLE_ROTATION = 0;
-    
-    // Minimum bubble constraints
     static MIN_BUBBLE_WIDTH = 50;
     static MIN_BUBBLE_HEIGHT = 38;
     
-    // Handle styling
+    // Handle sizes
     static RESIZE_HANDLE_SIZE = 8;
     static ROTATION_HANDLE_SIZE = 12;
     static CONTROL_POINT_HANDLE_SIZE = 10;
@@ -36,7 +34,7 @@ class Constants {
         left: { minX: -1.5, maxX: 0.3, minY: -0.3, maxY: 0.3 }
     };
     
-    // Default control point positions (relative to bubble center)
+    // Default control point positions
     static DEFAULT_CONTROL_POINTS = {
         top: { x: 0, y: -0.5 },
         right: { x: 0.5, y: 0 },
@@ -44,54 +42,17 @@ class Constants {
         left: { x: -0.5, y: 0 }
     };
     
-    // Control point directions
+    // Arrays
     static CONTROL_POINT_DIRECTIONS = ['top', 'right', 'bottom', 'left'];
-    
-    // Resize handle positions  
     static RESIZE_HANDLE_POSITIONS = ['nw', 'ne', 'sw', 'se'];
     
     // Export formats
     static EXPORT_FORMATS = {
-        'avif': {
-            mimeType: 'image/avif',
-            quality: 0.8,
-            extension: 'avif',
-            description: 'AVIF',
-            browserSupport: 'Chrome 85+, Firefox 93+, limited Safari',
-            benefits: 'Smallest file size, best compression'
-        },
-        'webp': {
-            mimeType: 'image/webp',
-            quality: 0.9,
-            extension: 'webp',
-            description: 'WebP',
-            browserSupport: 'Chrome 23+, Firefox 65+, Safari 14+',
-            benefits: 'Good compression, wide support'
-        },
-        'jpeg-high': {
-            mimeType: 'image/jpeg',
-            quality: 0.9,
-            extension: 'jpg',
-            description: 'JPEG High Quality',
-            browserSupport: 'Universal',
-            benefits: 'Universal compatibility'
-        },
-        'jpeg-medium': {
-            mimeType: 'image/jpeg',
-            quality: 0.75,
-            extension: 'jpg',
-            description: 'JPEG Medium Quality',
-            browserSupport: 'Universal',
-            benefits: 'Smaller size, universal compatibility'
-        },
-        'png': {
-            mimeType: 'image/png',
-            quality: undefined,
-            extension: 'png',
-            description: 'PNG',
-            browserSupport: 'Universal',
-            benefits: 'Lossless, transparency support'
-        }
+        'avif': { mimeType: 'image/avif', quality: 0.8, extension: 'avif' },
+        'webp': { mimeType: 'image/webp', quality: 0.9, extension: 'webp' },
+        'jpeg-high': { mimeType: 'image/jpeg', quality: 0.9, extension: 'jpg' },
+        'jpeg-medium': { mimeType: 'image/jpeg', quality: 0.75, extension: 'jpg' },
+        'png': { mimeType: 'image/png', quality: undefined, extension: 'png' }
     };
     
     // SVG bubble template
@@ -109,22 +70,15 @@ class Constants {
         </g>
     </svg>`;
     
-    // Tolerance for floating point comparisons
+    // Other constants
     static FLOAT_TOLERANCE = 0.01;
-    
-    // Animation and transition durations
     static HANDLE_TRANSITION_DURATION = '0.2s';
     static BUBBLE_TRANSITION_DURATION = '0.1s';
-    
-    // Copy offset for bubble duplication
     static COPY_OFFSET = 20;
-    
-    // Positioning offsets
     static BUBBLE_START_OFFSET = 50;
     static BUBBLE_STACK_OFFSET = 30;
 }
 
-// Export for ES6 modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = Constants;
 }
