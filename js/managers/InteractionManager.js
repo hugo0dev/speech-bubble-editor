@@ -43,7 +43,10 @@ class InteractionManager {
         document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         
         this.canvasContainer.addEventListener('click', (e) => {
-            if (e.target === this.canvasContainer || e.target.classList.contains('background-image')) {
+            // Check if click is on background image or canvas container itself
+            if (e.target === this.canvasContainer || 
+                e.target.id === 'background-image' ||
+                e.target === document.getElementById('background-image')) {
                 this.bubbleManager.deselectBubble();
             }
         });
@@ -99,10 +102,24 @@ class InteractionManager {
         this.isDragging = true;
         this.draggedBubble = bubbleElement;
         
-        const bubbleRect = bubbleElement.getBoundingClientRect();
+        // Get bubble data to check for deformation
+        const bubbleData = this.bubbleManager.getBubbleData(bubbleElement);
         
-        this.dragOffset.x = event.clientX - bubbleRect.left;
-        this.dragOffset.y = event.clientY - bubbleRect.top;
+        // Use the stored position data instead of getBoundingClientRect for deformed bubbles
+        if (bubbleData) {
+            // Calculate offset based on stored position, not transformed position
+            const containerRect = this.canvasContainer.getBoundingClientRect();
+            const bubbleX = bubbleData.x + containerRect.left;
+            const bubbleY = bubbleData.y + containerRect.top;
+            
+            this.dragOffset.x = event.clientX - bubbleX;
+            this.dragOffset.y = event.clientY - bubbleY;
+        } else {
+            // Fallback for non-data bubbles
+            const bubbleRect = bubbleElement.getBoundingClientRect();
+            this.dragOffset.x = event.clientX - bubbleRect.left;
+            this.dragOffset.y = event.clientY - bubbleRect.top;
+        }
         
         bubbleElement.style.opacity = '0.8';
         bubbleElement.style.zIndex = '100';
@@ -424,6 +441,24 @@ class InteractionManager {
     }
     
     handleKeyDown(event) {
+        // ALWAYS prevent Ctrl+R to avoid page refresh
+        if (event.ctrlKey && event.key === 'r') {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Only reset bubble if one is selected and deformed
+            const selectedBubble = this.bubbleManager.getSelectedBubble();
+            if (selectedBubble) {
+                const bubbleData = this.bubbleManager.getBubbleData(selectedBubble);
+                if (bubbleData?.isDeformed) {
+                    this.resetBubbleShape(selectedBubble);
+                    window.editor?.uiController?.forceUpdateBubbleControls();
+                }
+            }
+            
+            return; // Exit early to prevent any other handling
+        }
+        
         const selectedBubble = this.bubbleManager.getSelectedBubble();
         
         if (event.key === 'Delete' && selectedBubble) {
@@ -435,14 +470,6 @@ class InteractionManager {
         if (event.ctrlKey && event.key === 'd' && selectedBubble) {
             event.preventDefault();
             window.editor?.copySelectedBubble() || this.bubbleManager.copyBubble(selectedBubble);
-            return;
-        }
-        
-        if (event.ctrlKey && (event.key === 'r' || event.key === 'R' || event.code === 'KeyR') && selectedBubble) {
-            event.preventDefault();
-            event.stopPropagation();
-            this.resetBubbleShape(selectedBubble);
-            window.editor?.uiController?.forceUpdateBubbleControls();
             return;
         }
     }

@@ -319,13 +319,16 @@ class HandleManager {
         const bubbleData = this.getBubbleData(bubbleElement);
         if (!bubbleData) return;
         
+        // Get rotation from data attribute or bubbleData
+        const rotation = bubbleElement.getAttribute('data-rotation') || bubbleData.rotation || 0;
+        
         const handle = bubbleElement.rotationHandle;
         Object.assign(handle.style, {
             width: bubbleData.width + 'px',
             height: bubbleData.height + 'px',
             left: bubbleData.x + 'px',
             top: bubbleData.y + 'px',
-            transform: `rotate(${bubbleData.rotation}deg)`
+            transform: `rotate(${rotation}deg)`
         });
     }
     
