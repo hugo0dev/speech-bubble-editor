@@ -350,7 +350,7 @@ class InteractionManager {
         if (bubbleData) {
             Object.assign(bubbleData, { width: newWidth, height: newHeight, x: newX, y: newY });
             
-            if (bubbleData.isDeformed) {
+            if (bubbleData.isDeformed || bubbleData.flipX || bubbleData.flipY) {
                 this.controlPointManager.applyDeformationToBubble(this.resizeBubble, bubbleData);
             }
         }
@@ -371,17 +371,17 @@ class InteractionManager {
         
         newRotation = ((newRotation % 360) + 360) % 360;
         
-        // Get bubble data to check if deformed
+        // Get bubble data to check if deformed or flipped
         const bubbleData = this.bubbleManager.getBubbleData(this.rotationBubble);
         if (bubbleData) {
             // Update rotation in data
             bubbleData.rotation = newRotation;
             
-            if (bubbleData.isDeformed) {
-                // If deformed, let ControlPointManager handle the combined transform
+            if (bubbleData.isDeformed || bubbleData.flipX || bubbleData.flipY) {
+                // If deformed or flipped, let ControlPointManager handle the combined transform
                 this.controlPointManager.applyDeformationToBubble(this.rotationBubble, bubbleData);
             } else {
-                // If not deformed, apply rotation directly
+                // If not deformed or flipped, apply rotation directly
                 this.rotationBubble.style.transform = `rotate(${newRotation}deg)`;
             }
         } else {
@@ -463,6 +463,22 @@ class InteractionManager {
                 this.resetBubbleShape(selectedBubble);
                 window.editor?.uiController?.forceUpdateBubbleControls();
             }
+            return;
+        }
+        
+        // Flip horizontal with H key
+        if ((event.key === 'h' || event.key === 'H') && selectedBubble && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            window.editor?.flipSelectedBubbleHorizontal() || this.bubbleManager.flipBubbleHorizontal(selectedBubble);
+            window.editor?.uiController?.forceUpdateBubbleControls();
+            return;
+        }
+        
+        // Flip vertical with V key
+        if ((event.key === 'v' || event.key === 'V') && selectedBubble && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            window.editor?.flipSelectedBubbleVertical() || this.bubbleManager.flipBubbleVertical(selectedBubble);
+            window.editor?.uiController?.forceUpdateBubbleControls();
             return;
         }
         

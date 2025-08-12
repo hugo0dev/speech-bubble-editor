@@ -261,8 +261,23 @@ class ControlPointManager {
         if (!bubbleElement || !bubbleData) return;
         
         if (!bubbleData.isDeformed) {
-            // Apply only rotation when not deformed
-            bubbleElement.style.transform = `rotate(${bubbleData.rotation || 0}deg)`;
+            // Build transform with flip and rotation when not deformed
+            const transforms = [];
+            
+            // Apply flips first
+            if (bubbleData.flipX) {
+                transforms.push('scaleX(-1)');
+            }
+            if (bubbleData.flipY) {
+                transforms.push('scaleY(-1)');
+            }
+            
+            // Then apply rotation
+            if (bubbleData.rotation) {
+                transforms.push(`rotate(${bubbleData.rotation || 0}deg)`);
+            }
+            
+            bubbleElement.style.transform = transforms.join(' ');
             bubbleElement.style.transformOrigin = 'center center';
             bubbleElement.innerHTML = Constants.BUBBLE_SVG;
             return;
@@ -274,16 +289,35 @@ class ControlPointManager {
         
         const transformData = this.calculateCSSTransform(bubbleData);
         
-        if (transformData.transformString) {
-            // Combine rotation with deformation transforms
-            const rotationTransform = `rotate(${bubbleData.rotation || 0}deg)`;
-            const combinedTransform = `${rotationTransform} ${transformData.transformString}`;
+        if (transformData.transformString || bubbleData.flipX || bubbleData.flipY || bubbleData.rotation) {
+            // Build combined transform: flip, rotation, then deformation
+            const transforms = [];
             
-            bubbleElement.style.transformOrigin = transformData.transformOrigin;
+            // Apply flips first
+            if (bubbleData.flipX) {
+                transforms.push('scaleX(-1)');
+            }
+            if (bubbleData.flipY) {
+                transforms.push('scaleY(-1)');
+            }
+            
+            // Then rotation
+            if (bubbleData.rotation) {
+                transforms.push(`rotate(${bubbleData.rotation || 0}deg)`);
+            }
+            
+            // Finally deformation transforms
+            if (transformData.transformString) {
+                transforms.push(transformData.transformString);
+            }
+            
+            const combinedTransform = transforms.join(' ');
+            
+            bubbleElement.style.transformOrigin = transformData.transformOrigin || 'center center';
             bubbleElement.style.transform = combinedTransform;
         } else {
-            // Apply only rotation if no deformation transform
-            bubbleElement.style.transform = `rotate(${bubbleData.rotation || 0}deg)`;
+            // No transforms to apply
+            bubbleElement.style.transform = '';
             bubbleElement.style.transformOrigin = 'center center';
         }
     }
@@ -294,8 +328,23 @@ class ControlPointManager {
         bubbleData.deformationMatrix = null;
         
         if (bubbleData.element) {
-            // Preserve rotation when resetting
-            bubbleData.element.style.transform = `rotate(${bubbleData.rotation || 0}deg)`;
+            // Build transform with preserved flip and rotation
+            const transforms = [];
+            
+            // Preserve flips
+            if (bubbleData.flipX) {
+                transforms.push('scaleX(-1)');
+            }
+            if (bubbleData.flipY) {
+                transforms.push('scaleY(-1)');
+            }
+            
+            // Preserve rotation
+            if (bubbleData.rotation) {
+                transforms.push(`rotate(${bubbleData.rotation || 0}deg)`);
+            }
+            
+            bubbleData.element.style.transform = transforms.join(' ');
             bubbleData.element.style.transformOrigin = 'center center';
             bubbleData.element.innerHTML = Constants.BUBBLE_SVG;
         }

@@ -27,7 +27,9 @@ class UIController {
             bubbleCount: document.getElementById('bubbleCount'),
             copyBtn: document.getElementById('copyBubbleBtn'),
             deleteBtn: document.getElementById('deleteBubbleBtn'),
-            resetBtn: document.getElementById('resetBubbleBtn'), // ADD THIS LINE
+            resetBtn: document.getElementById('resetBubbleBtn'),
+            flipHorizontalBtn: document.getElementById('flipHorizontalBtn'),
+            flipVerticalBtn: document.getElementById('flipVerticalBtn'),
             exportBtn: document.getElementById('exportImageBtn'),
             addBtn: document.getElementById('addBubbleBtn')
         };
@@ -50,7 +52,7 @@ class UIController {
     }
     
     setupControlEventListeners() {
-        const { addBtn, copyBtn, deleteBtn, resetBtn, exportBtn } = this.domElements;
+        const { addBtn, copyBtn, deleteBtn, resetBtn, flipHorizontalBtn, flipVerticalBtn, exportBtn } = this.domElements;
         
         if (addBtn && !addBtn.hasAttribute('data-listener-added')) {
             addBtn.addEventListener('click', () => this.onAddBubbleClick());
@@ -67,10 +69,19 @@ class UIController {
             deleteBtn.setAttribute('data-listener-added', 'true');
         }
         
-        // ADD THIS BLOCK
         if (resetBtn && !resetBtn.hasAttribute('data-listener-added')) {
             resetBtn.addEventListener('click', () => this.onResetBubbleClick());
             resetBtn.setAttribute('data-listener-added', 'true');
+        }
+        
+        if (flipHorizontalBtn && !flipHorizontalBtn.hasAttribute('data-listener-added')) {
+            flipHorizontalBtn.addEventListener('click', () => this.onFlipHorizontalClick());
+            flipHorizontalBtn.setAttribute('data-listener-added', 'true');
+        }
+        
+        if (flipVerticalBtn && !flipVerticalBtn.hasAttribute('data-listener-added')) {
+            flipVerticalBtn.addEventListener('click', () => this.onFlipVerticalClick());
+            flipVerticalBtn.setAttribute('data-listener-added', 'true');
         }
         
         if (exportBtn && !exportBtn.hasAttribute('data-listener-added')) {
@@ -82,7 +93,7 @@ class UIController {
     updateBubbleControls() {
         if (!this.bubbleManager) return;
 
-        const { bubbleCount, copyBtn, deleteBtn, resetBtn, exportBtn } = this.domElements;
+        const { bubbleCount, copyBtn, deleteBtn, resetBtn, flipHorizontalBtn, flipVerticalBtn, exportBtn } = this.domElements;
         
         const selectedBubble = this.bubbleManager.getSelectedBubble();
         const totalBubbles = this.bubbleManager.getBubbleCount();
@@ -98,8 +109,9 @@ class UIController {
         
         if (copyBtn) copyBtn.disabled = !selectedBubble;
         if (deleteBtn) deleteBtn.disabled = !selectedBubble;
+        if (flipHorizontalBtn) flipHorizontalBtn.disabled = !selectedBubble;
+        if (flipVerticalBtn) flipVerticalBtn.disabled = !selectedBubble;
         
-        // ADD THIS BLOCK
         if (resetBtn) {
             const selectedBubbleData = this.bubbleManager.getSelectedBubbleData?.();
             resetBtn.disabled = !selectedBubble || !selectedBubbleData?.isDeformed;
@@ -138,6 +150,16 @@ class UIController {
 
     onResetBubbleClick() {
         this.onResetBubble?.();
+        this.forceUpdateBubbleControls();
+    }
+    
+    onFlipHorizontalClick() {
+        this.onFlipHorizontal?.();
+        this.forceUpdateBubbleControls();
+    }
+    
+    onFlipVerticalClick() {
+        this.onFlipVertical?.();
         this.forceUpdateBubbleControls();
     }
     
