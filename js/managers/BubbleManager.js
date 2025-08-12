@@ -225,22 +225,25 @@ class BubbleManager {
     }
     
     applyBubbleStyles(bubbleContainer, x, y, width, height, rotation) {
-    Object.assign(bubbleContainer.style, {
-        position: 'absolute',
-        left: x + 'px',
-        top: y + 'px',
-        width: width + 'px',
-        height: height + 'px',
-        cursor: 'move',
-        transformOrigin: 'center center',
-        // Store rotation separately to avoid conflicts with deformation transforms
-        transform: `rotate(${rotation}deg)`,
-        zIndex: Constants.BUBBLE_Z_INDEX
-    });
-    
-    // Store rotation in a data attribute for later reference
-    bubbleContainer.setAttribute('data-rotation', rotation);
-}
+        Object.assign(bubbleContainer.style, {
+            position: 'absolute',
+            left: x + 'px',
+            top: y + 'px',
+            width: width + 'px',
+            height: height + 'px',
+            cursor: 'move',
+            transformOrigin: 'center center',
+            // Don't set transform here - let deformation manager handle it
+            zIndex: Constants.BUBBLE_Z_INDEX
+        });
+        
+        // Get bubble data to check if deformed
+        const bubbleData = this.getBubbleData(bubbleContainer);
+        if (bubbleData && !bubbleData.isDeformed) {
+            // Only set rotation if not deformed (deformation manager will handle combined transform)
+            bubbleContainer.style.transform = `rotate(${rotation}deg)`;
+        }
+    }
     
     createBubbleElementFromData(bubbleData) {
         const bubbleContainer = document.createElement('div');

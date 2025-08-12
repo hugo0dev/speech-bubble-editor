@@ -43,10 +43,8 @@ class InteractionManager {
         document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         
         this.canvasContainer.addEventListener('click', (e) => {
-            // Check if click is on background image or canvas container itself
-            if (e.target === this.canvasContainer || 
-                e.target.id === 'background-image' ||
-                e.target === document.getElementById('background-image')) {
+            // Fix: Check for ID 'background-image' not class, and also check if clicking on container itself
+            if (e.target === this.canvasContainer || e.target.id === 'background-image') {
                 this.bubbleManager.deselectBubble();
             }
         });
@@ -66,7 +64,7 @@ class InteractionManager {
             }
         });
     }
-    
+
     handleBubbleRightClick(event, bubbleElement) {
         event.preventDefault();
         
@@ -102,20 +100,20 @@ class InteractionManager {
         this.isDragging = true;
         this.draggedBubble = bubbleElement;
         
-        // Get bubble data to check for deformation
+        // Get the bubble data to use stored position instead of visual position
         const bubbleData = this.bubbleManager.getBubbleData(bubbleElement);
+        const containerRect = this.canvasContainer.getBoundingClientRect();
         
-        // Use the stored position data instead of getBoundingClientRect for deformed bubbles
         if (bubbleData) {
-            // Calculate offset based on stored position, not transformed position
-            const containerRect = this.canvasContainer.getBoundingClientRect();
-            const bubbleX = bubbleData.x + containerRect.left;
-            const bubbleY = bubbleData.y + containerRect.top;
+            // Calculate offset from the stored position, not the transformed visual position
+            // This prevents jumping when dragging deformed bubbles
+            const bubbleLeft = bubbleData.x + containerRect.left;
+            const bubbleTop = bubbleData.y + containerRect.top;
             
-            this.dragOffset.x = event.clientX - bubbleX;
-            this.dragOffset.y = event.clientY - bubbleY;
+            this.dragOffset.x = event.clientX - bubbleLeft;
+            this.dragOffset.y = event.clientY - bubbleTop;
         } else {
-            // Fallback for non-data bubbles
+            // Fallback to old method if no bubble data
             const bubbleRect = bubbleElement.getBoundingClientRect();
             this.dragOffset.x = event.clientX - bubbleRect.left;
             this.dragOffset.y = event.clientY - bubbleRect.top;
@@ -236,6 +234,7 @@ class InteractionManager {
             bubbleData.controlPoints[this.controlPointDirection] = validatedPosition;
             bubbleData.isDeformed = this.controlPointManager.checkIfBubbleIsDeformed(bubbleData);
             
+            // Apply deformation which will now preserve rotation
             this.applyRealTimeDeformation();
             
             this.handleManager.updateControlPointHandlePosition(
@@ -372,14 +371,25 @@ class InteractionManager {
         
         newRotation = ((newRotation % 360) + 360) % 360;
         
-        this.rotationBubble.style.transform = `rotate(${newRotation}deg)`;
-        
-        this.handleManager.updateHandlePositions(this.rotationBubble);
-        
+        // Get bubble data to check if deformed
         const bubbleData = this.bubbleManager.getBubbleData(this.rotationBubble);
         if (bubbleData) {
+            // Update rotation in data
             bubbleData.rotation = newRotation;
+            
+            if (bubbleData.isDeformed) {
+                // If deformed, let ControlPointManager handle the combined transform
+                this.controlPointManager.applyDeformationToBubble(this.rotationBubble, bubbleData);
+            } else {
+                // If not deformed, apply rotation directly
+                this.rotationBubble.style.transform = `rotate(${newRotation}deg)`;
+            }
+        } else {
+            // Fallback if no bubble data
+            this.rotationBubble.style.transform = `rotate(${newRotation}deg)`;
         }
+        
+        this.handleManager.updateHandlePositions(this.rotationBubble);
     }
     
     handleMouseUp(event) {
@@ -441,25 +451,20 @@ class InteractionManager {
     }
     
     handleKeyDown(event) {
-        // ALWAYS prevent Ctrl+R to avoid page refresh
-        if (event.ctrlKey && event.key === 'r') {
+        const selectedBubble = this.bubbleManager.getSelectedBubble();
+        
+        // Always intercept Ctrl+R to prevent page refresh
+        if (event.ctrlKey && (event.key === 'r' || event.key === 'R' || event.code === 'KeyR')) {
             event.preventDefault();
             event.stopPropagation();
             
-            // Only reset bubble if one is selected and deformed
-            const selectedBubble = this.bubbleManager.getSelectedBubble();
+            // Only reset if there's a selected bubble
             if (selectedBubble) {
-                const bubbleData = this.bubbleManager.getBubbleData(selectedBubble);
-                if (bubbleData?.isDeformed) {
-                    this.resetBubbleShape(selectedBubble);
-                    window.editor?.uiController?.forceUpdateBubbleControls();
-                }
+                this.resetBubbleShape(selectedBubble);
+                window.editor?.uiController?.forceUpdateBubbleControls();
             }
-            
-            return; // Exit early to prevent any other handling
+            return;
         }
-        
-        const selectedBubble = this.bubbleManager.getSelectedBubble();
         
         if (event.key === 'Delete' && selectedBubble) {
             event.preventDefault();
