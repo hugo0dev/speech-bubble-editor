@@ -32,7 +32,9 @@ class BubbleManager {
             x, y, width, height, rotation,
             controlPoints: { ...Constants.DEFAULT_CONTROL_POINTS },
             isDeformed: false,
-            deformationMatrix: null
+            deformationMatrix: null,
+            flipX: false,  // Add horizontal flip state
+            flipY: false   // Add vertical flip state
         };
     }
     
@@ -98,6 +100,10 @@ class BubbleManager {
             originalBubbleData.rotation
         );
         
+        // Copy flip state
+        newBubbleData.flipX = originalBubbleData.flipX;
+        newBubbleData.flipY = originalBubbleData.flipY;
+        
         if (originalBubbleData.isDeformed) {
             newBubbleData.controlPoints = JSON.parse(JSON.stringify(originalBubbleData.controlPoints));
             newBubbleData.isDeformed = originalBubbleData.isDeformed;
@@ -114,6 +120,74 @@ class BubbleManager {
         this.selectBubble(newBubbleElement);
         
         return newBubbleData;
+    }
+    
+    flipBubbleHorizontal(bubbleElement) {
+        if (!bubbleElement) return false;
+        
+        const bubbleData = this.getBubbleData(bubbleElement);
+        if (!bubbleData) return false;
+        
+        // Toggle horizontal flip state
+        bubbleData.flipX = !bubbleData.flipX;
+        
+        // Apply the flip transformation
+        this.applyFlipTransform(bubbleElement, bubbleData);
+        
+        // Update handles if needed
+        if (this.handleManager) {
+            this.handleManager.updateHandlePositions(bubbleElement);
+        }
+        
+        return true;
+    }
+    
+    flipBubbleVertical(bubbleElement) {
+        if (!bubbleElement) return false;
+        
+        const bubbleData = this.getBubbleData(bubbleElement);
+        if (!bubbleData) return false;
+        
+        // Toggle vertical flip state
+        bubbleData.flipY = !bubbleData.flipY;
+        
+        // Apply the flip transformation
+        this.applyFlipTransform(bubbleElement, bubbleData);
+        
+        // Update handles if needed
+        if (this.handleManager) {
+            this.handleManager.updateHandlePositions(bubbleElement);
+        }
+        
+        return true;
+    }
+    
+    applyFlipTransform(bubbleElement, bubbleData) {
+        if (!bubbleElement || !bubbleData) return;
+        
+        // If the bubble is deformed, let ControlPointManager handle the combined transform
+        if (bubbleData.isDeformed && this.controlPointManager) {
+            this.controlPointManager.applyDeformationToBubble(bubbleElement, bubbleData);
+        } else {
+            // Build the transform string with flip and rotation
+            const transforms = [];
+            
+            // Apply flips first
+            if (bubbleData.flipX) {
+                transforms.push('scaleX(-1)');
+            }
+            if (bubbleData.flipY) {
+                transforms.push('scaleY(-1)');
+            }
+            
+            // Then apply rotation
+            if (bubbleData.rotation) {
+                transforms.push(`rotate(${bubbleData.rotation}deg)`);
+            }
+            
+            bubbleElement.style.transform = transforms.join(' ');
+            bubbleElement.style.transformOrigin = 'center center';
+        }
     }
     
     selectBubble(bubbleElement) {
@@ -233,16 +307,10 @@ class BubbleManager {
             height: height + 'px',
             cursor: 'move',
             transformOrigin: 'center center',
-            // Don't set transform here - let deformation manager handle it
             zIndex: Constants.BUBBLE_Z_INDEX
         });
         
-        // Get bubble data to check if deformed
-        const bubbleData = this.getBubbleData(bubbleContainer);
-        if (bubbleData && !bubbleData.isDeformed) {
-            // Only set rotation if not deformed (deformation manager will handle combined transform)
-            bubbleContainer.style.transform = `rotate(${rotation}deg)`;
-        }
+        // Don't set transform here - let applyFlipTransform or deformation manager handle it
     }
     
     createBubbleElementFromData(bubbleData) {
@@ -259,8 +327,13 @@ class BubbleManager {
             bubbleData.rotation
         );
         
+        // Apply transformations in the correct order
         if (bubbleData.isDeformed && this.controlPointManager) {
+            // Deformation manager will handle all transforms including flip
             this.controlPointManager.applyDeformationToBubble(bubbleContainer, bubbleData);
+        } else {
+            // Apply flip and rotation transforms
+            this.applyFlipTransform(bubbleContainer, bubbleData);
         }
         
         return bubbleContainer;

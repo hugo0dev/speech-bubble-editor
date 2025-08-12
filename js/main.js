@@ -67,7 +67,9 @@ class SpeechBubbleEditor {
         this.uiController.onAddBubble = () => this.addSpeechBubble();
         this.uiController.onCopyBubble = () => this.copySelectedBubble();
         this.uiController.onDeleteBubble = () => this.deleteSelectedBubble();
-        this.uiController.onResetBubble = () => this.resetSelectedBubble(); // ADD THIS LINE
+        this.uiController.onResetBubble = () => this.resetSelectedBubble();
+        this.uiController.onFlipHorizontal = () => this.flipSelectedBubbleHorizontal();
+        this.uiController.onFlipVertical = () => this.flipSelectedBubbleVertical();
         this.uiController.onExport = () => this.exportImage();
     }
     
@@ -152,6 +154,30 @@ class SpeechBubbleEditor {
         this.uiController.forceUpdateBubbleControls();
         
         return true;
+    }
+    
+    flipSelectedBubbleHorizontal() {
+        if (!this.isInitialized) return false;
+        
+        const bubbleManager = this.appCoordinator.getManager('bubbleManager');
+        if (!bubbleManager) return false;
+        
+        const selectedBubble = bubbleManager.getSelectedBubble();
+        if (!selectedBubble) return false;
+        
+        return bubbleManager.flipBubbleHorizontal(selectedBubble);
+    }
+    
+    flipSelectedBubbleVertical() {
+        if (!this.isInitialized) return false;
+        
+        const bubbleManager = this.appCoordinator.getManager('bubbleManager');
+        if (!bubbleManager) return false;
+        
+        const selectedBubble = bubbleManager.getSelectedBubble();
+        if (!selectedBubble) return false;
+        
+        return bubbleManager.flipBubbleVertical(selectedBubble);
     }
     
     clearAllBubbles() {

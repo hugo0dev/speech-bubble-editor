@@ -82,6 +82,31 @@ header h1 {
     transform: none;
 }
 
+.transform-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.flip-btn {
+    background-color: #673AB7;
+    color: white;
+    min-width: 100px;
+}
+
+.flip-btn:hover:not(:disabled) {
+    background-color: #5E35B1;
+    transform: translateY(-1px);
+}
+
+.flip-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .export-controls {
     display: flex;
     align-items: center;
@@ -206,6 +231,12 @@ header h1 {
     height: 100%;
     color: #999;
     font-size: 18px;
+    flex-direction: column;
+}
+
+.feature-info {
+    font-size: 14px;
+    margin-top: 10px;
 }
 
 #background-image {
