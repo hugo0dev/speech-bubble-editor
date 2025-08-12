@@ -258,28 +258,35 @@ class ControlPointManager {
     }
     
     applyDeformationToBubble(bubbleElement, bubbleData) {
-        if (!bubbleElement || !bubbleData) return;
-        
-        if (!bubbleData.isDeformed) {
-            bubbleElement.style.transform = '';
-            bubbleElement.style.transformOrigin = 'center center';
-            bubbleElement.innerHTML = Constants.BUBBLE_SVG;
-            return;
-        }
-        
-        if (!bubbleElement.innerHTML.includes('xmlns')) {
-            bubbleElement.innerHTML = Constants.BUBBLE_SVG;
-        }
-        
-        const transformData = this.calculateCSSTransform(bubbleData);
-        
-        if (transformData.transformString) {
-            this.applyCSSTransformToBubble(bubbleElement, transformData);
-        } else {
-            bubbleElement.style.transform = '';
-            bubbleElement.style.transformOrigin = 'center center';
-        }
+    if (!bubbleElement || !bubbleData) return;
+    
+    if (!bubbleData.isDeformed) {
+        // Reset only deformation, keep rotation
+        const rotation = bubbleElement.getAttribute('data-rotation') || bubbleData.rotation || 0;
+        bubbleElement.style.transform = `rotate(${rotation}deg)`;
+        bubbleElement.style.transformOrigin = 'center center';
+        bubbleElement.innerHTML = Constants.BUBBLE_SVG;
+        return;
     }
+    
+    if (!bubbleElement.innerHTML.includes('xmlns')) {
+        bubbleElement.innerHTML = Constants.BUBBLE_SVG;
+    }
+    
+    const transformData = this.calculateCSSTransform(bubbleData);
+    
+    if (transformData.transformString) {
+        // Apply deformation and rotation together
+        const rotation = bubbleElement.getAttribute('data-rotation') || bubbleData.rotation || 0;
+        bubbleElement.style.transformOrigin = transformData.transformOrigin;
+        bubbleElement.style.transform = `rotate(${rotation}deg) ${transformData.transformString}`;
+    } else {
+        // No deformation, just rotation
+        const rotation = bubbleElement.getAttribute('data-rotation') || bubbleData.rotation || 0;
+        bubbleElement.style.transform = `rotate(${rotation}deg)`;
+        bubbleElement.style.transformOrigin = 'center center';
+    }
+}
     
     resetControlPoints(bubbleData) {
         bubbleData.controlPoints = { ...Constants.DEFAULT_CONTROL_POINTS };

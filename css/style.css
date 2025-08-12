@@ -138,6 +138,23 @@ header h1 {
     transform: none;
 }
 
+.reset-btn {
+    background-color: #9C27B0;
+    color: white;
+}
+
+.reset-btn:hover:not(:disabled) {
+    background-color: #7B1FA2;
+    transform: translateY(-1px);
+}
+
+.reset-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .bubble-count {
     font-size: 14px;
     color: #666;

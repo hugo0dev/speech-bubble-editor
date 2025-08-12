@@ -27,6 +27,7 @@ class UIController {
             bubbleCount: document.getElementById('bubbleCount'),
             copyBtn: document.getElementById('copyBubbleBtn'),
             deleteBtn: document.getElementById('deleteBubbleBtn'),
+            resetBtn: document.getElementById('resetBubbleBtn'), // ADD THIS LINE
             exportBtn: document.getElementById('exportImageBtn'),
             addBtn: document.getElementById('addBubbleBtn')
         };
@@ -49,7 +50,7 @@ class UIController {
     }
     
     setupControlEventListeners() {
-        const { addBtn, copyBtn, deleteBtn, exportBtn } = this.domElements;
+        const { addBtn, copyBtn, deleteBtn, resetBtn, exportBtn } = this.domElements;
         
         if (addBtn && !addBtn.hasAttribute('data-listener-added')) {
             addBtn.addEventListener('click', () => this.onAddBubbleClick());
@@ -66,6 +67,12 @@ class UIController {
             deleteBtn.setAttribute('data-listener-added', 'true');
         }
         
+        // ADD THIS BLOCK
+        if (resetBtn && !resetBtn.hasAttribute('data-listener-added')) {
+            resetBtn.addEventListener('click', () => this.onResetBubbleClick());
+            resetBtn.setAttribute('data-listener-added', 'true');
+        }
+        
         if (exportBtn && !exportBtn.hasAttribute('data-listener-added')) {
             exportBtn.addEventListener('click', () => this.onExportClick());
             exportBtn.setAttribute('data-listener-added', 'true');
@@ -75,7 +82,7 @@ class UIController {
     updateBubbleControls() {
         if (!this.bubbleManager) return;
 
-        const { bubbleCount, copyBtn, deleteBtn, exportBtn } = this.domElements;
+        const { bubbleCount, copyBtn, deleteBtn, resetBtn, exportBtn } = this.domElements;
         
         const selectedBubble = this.bubbleManager.getSelectedBubble();
         const totalBubbles = this.bubbleManager.getBubbleCount();
@@ -91,6 +98,12 @@ class UIController {
         
         if (copyBtn) copyBtn.disabled = !selectedBubble;
         if (deleteBtn) deleteBtn.disabled = !selectedBubble;
+        
+        // ADD THIS BLOCK
+        if (resetBtn) {
+            const selectedBubbleData = this.bubbleManager.getSelectedBubbleData?.();
+            resetBtn.disabled = !selectedBubble || !selectedBubbleData?.isDeformed;
+        }
         
         if (exportBtn) {
             const hasBackgroundImage = this.backgroundImageElement?.src;
@@ -120,6 +133,11 @@ class UIController {
     
     onDeleteBubbleClick() {
         this.onDeleteBubble?.();
+        this.forceUpdateBubbleControls();
+    }
+
+    onResetBubbleClick() {
+        this.onResetBubble?.();
         this.forceUpdateBubbleControls();
     }
     

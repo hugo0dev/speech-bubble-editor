@@ -67,6 +67,7 @@ class SpeechBubbleEditor {
         this.uiController.onAddBubble = () => this.addSpeechBubble();
         this.uiController.onCopyBubble = () => this.copySelectedBubble();
         this.uiController.onDeleteBubble = () => this.deleteSelectedBubble();
+        this.uiController.onResetBubble = () => this.resetSelectedBubble(); // ADD THIS LINE
         this.uiController.onExport = () => this.exportImage();
     }
     
@@ -121,6 +122,36 @@ class SpeechBubbleEditor {
         if (!selectedBubble) return false;
         
         return bubbleManager.deleteBubble(selectedBubble);
+    }
+
+    resetSelectedBubble() {
+        if (!this.isInitialized) return false;
+        
+        const bubbleManager = this.appCoordinator.getManager('bubbleManager');
+        const controlPointManager = this.appCoordinator.getManager('controlPointManager');
+        const handleManager = this.appCoordinator.getManager('handleManager');
+        
+        if (!bubbleManager || !controlPointManager) return false;
+        
+        const selectedBubble = bubbleManager.getSelectedBubble();
+        if (!selectedBubble) return false;
+        
+        const bubbleData = bubbleManager.getBubbleData(selectedBubble);
+        if (!bubbleData) return false;
+        
+        // Reset the control points
+        controlPointManager.resetControlPoints(bubbleData);
+        controlPointManager.applyDeformationToBubble(selectedBubble, bubbleData);
+        
+        // Update handle positions
+        if (handleManager) {
+            handleManager.updateControlPointHandlePositions(selectedBubble);
+        }
+        
+        // Force UI update
+        this.uiController.forceUpdateBubbleControls();
+        
+        return true;
     }
     
     clearAllBubbles() {
