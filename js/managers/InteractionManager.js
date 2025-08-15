@@ -826,19 +826,56 @@ class InteractionManager {
         }
     }
     
-    // ===== RESIZE MOVE - WILL BE ENHANCED IN NEXT INCREMENT =====
+    // ===== GROUP RESIZE IMPLEMENTATION (Phase 4 - Increment 2) =====
     
     handleResizeMove(event) {
         event.preventDefault();
         
-        // TODO: Phase 4 - Increment 2 will add group resize logic here
-        // For now, handle individual resize only
         if (this.isGroupResize) {
-            console.log('Group resize move - placeholder for Increment 2');
-            // Placeholder: Individual resize behavior for now
+            // Handle group resize operation
+            this.handleGroupResizeMove(event);
+        } else {
+            // Handle individual resize operation
+            this.handleIndividualResizeMove(event);
+        }
+    }
+    
+    /**
+     * Handle group resize movement
+     * @param {MouseEvent} event - Mouse move event
+     */
+    handleGroupResizeMove(event) {
+        if (!this.groupResizeMembers.length || !this.groupTransformCenter || !this.resizeStartData) {
+            return;
         }
         
-        // Existing individual resize logic
+        // Calculate scale factor based on primary element's resize
+        const deltaX = event.clientX - this.resizeStartData.mouseX;
+        const deltaY = event.clientY - this.resizeStartData.mouseY;
+        
+        // Determine scale factor based on resize handle direction
+        let scaleFactor = 1.0;
+        const delta = this.resizeHandle.includes('e') ? deltaX : -deltaX;
+        const newWidth = Math.max(Constants.MIN_BUBBLE_WIDTH, this.resizeStartData.width + delta);
+        scaleFactor = newWidth / this.resizeStartData.width;
+        
+        // Constrain scale factor to reasonable limits
+        scaleFactor = Math.max(0.3, Math.min(3.0, scaleFactor));
+        
+        // Apply group resize transformation
+        this.updateGroupResize(scaleFactor, this.groupTransformCenter, this.groupOriginalPositions);
+        
+        // Update handles for the primary element only
+        if (this.primaryTransformElement && this.handleManager) {
+            this.handleManager.updateHandlePositions(this.primaryTransformElement);
+        }
+    }
+    
+    /**
+     * Handle individual resize movement (existing logic)
+     * @param {MouseEvent} event - Mouse move event
+     */
+    handleIndividualResizeMove(event) {
         const deltaX = event.clientX - this.resizeStartData.mouseX;
         const deltaY = event.clientY - this.resizeStartData.mouseY;
         
@@ -893,6 +930,169 @@ class InteractionManager {
                 this.controlPointManager.applyDeformationToBubble(this.resizeBubble, bubbleData);
             }
         }
+    }
+    
+    /**
+     * Update all group members during resize operation
+     * @param {number} scaleFactor - Scale factor for the resize
+     * @param {Object} groupCenter - Center point of the group {x, y}
+     * @param {Map} originalBounds - Original bounds of group members
+     */
+    updateGroupResize(scaleFactor, groupCenter, originalBounds) {
+        if (!originalBounds || !groupCenter) {
+            return;
+        }
+        
+        // Calculate new bounds for all group members
+        const newBounds = new Map();
+        
+        originalBounds.forEach((bounds, element) => {
+            // Calculate new position relative to group center
+            const relativeCenterX = bounds.x + bounds.width / 2 - groupCenter.x;
+            const relativeCenterY = bounds.y + bounds.height / 2 - groupCenter.y;
+            
+            // Scale the relative position and size
+            const newRelativeCenterX = relativeCenterX * scaleFactor;
+            const newRelativeCenterY = relativeCenterY * scaleFactor;
+            const newWidth = bounds.width * scaleFactor;
+            const newHeight = bounds.height * scaleFactor;
+            
+            // Calculate new absolute position
+            const newX = groupCenter.x + newRelativeCenterX - newWidth / 2;
+            const newY = groupCenter.y + newRelativeCenterY - newHeight / 2;
+            
+            const elementBounds = {
+                x: newX,
+                y: newY,
+                width: newWidth,
+                height: newHeight
+            };
+            
+            newBounds.set(element, elementBounds);
+        });
+        
+        // Apply boundary constraints to the entire group
+        const constrainedBounds = this.constrainGroupToCanvas(newBounds);
+        
+        // Apply new bounds to all group members
+        constrainedBounds.forEach((bounds, element) => {
+            this.applyElementResize(element, bounds);
+        });
+    }
+    
+    /**
+     * Apply resize to individual element within group
+     * @param {HTMLElement} element - Element to resize
+     * @param {Object} newBounds - New bounds {x, y, width, height}
+     */
+    applyElementResize(element, newBounds) {
+        // Try to apply as bubble first
+        const bubbleData = this.bubbleManager?.getBubbleData(element);
+        if (bubbleData) {
+            // Update bubble data
+            bubbleData.x = newBounds.x;
+            bubbleData.y = newBounds.y;
+            bubbleData.width = newBounds.width;
+            bubbleData.height = newBounds.height;
+            
+            // Update element styles
+            Object.assign(element.style, {
+                left: newBounds.x + 'px',
+                top: newBounds.y + 'px',
+                width: newBounds.width + 'px',
+                height: newBounds.height + 'px'
+            });
+            
+            // Apply deformation if needed
+            if (bubbleData.isDeformed || bubbleData.flipX || bubbleData.flipY) {
+                this.controlPointManager.applyDeformationToBubble(element, bubbleData);
+            }
+            
+            return;
+        }
+        
+        // Try to apply as text element
+        const textElementManager = window.editor?.textElementManager;
+        if (textElementManager) {
+            const textData = textElementManager.getTextDataByElement(element);
+            if (textData) {
+                // For text elements, scale position but keep font size for now
+                // Future enhancement could scale font size proportionally
+                textElementManager.updateTextElementPosition(element, newBounds.x, newBounds.y);
+                return;
+            }
+        }
+        
+        // Fallback: update element style directly
+        Object.assign(element.style, {
+            left: newBounds.x + 'px',
+            top: newBounds.y + 'px'
+        });
+    }
+    
+    /**
+     * Apply boundary constraints to group during transformation
+     * @param {Map} elementBounds - Map of element to bounds
+     * @returns {Map} - Constrained bounds
+     */
+    constrainGroupToCanvas(elementBounds) {
+        if (!elementBounds || elementBounds.size === 0) {
+            return elementBounds;
+        }
+        
+        // Find the overall bounds of the transformed group
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        
+        elementBounds.forEach((bounds) => {
+            minX = Math.min(minX, bounds.x);
+            minY = Math.min(minY, bounds.y);
+            maxX = Math.max(maxX, bounds.x + bounds.width);
+            maxY = Math.max(maxY, bounds.y + bounds.height);
+        });
+        
+        // Calculate how much the group exceeds canvas boundaries
+        const canvasWidth = this.canvasContainer.offsetWidth;
+        const canvasHeight = this.canvasContainer.offsetHeight;
+        
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        // Check left boundary
+        if (minX < 0) {
+            offsetX = -minX;
+        }
+        // Check right boundary
+        else if (maxX > canvasWidth) {
+            offsetX = canvasWidth - maxX;
+        }
+        
+        // Check top boundary
+        if (minY < 0) {
+            offsetY = -minY;
+        }
+        // Check bottom boundary
+        else if (maxY > canvasHeight) {
+            offsetY = canvasHeight - maxY;
+        }
+        
+        // Apply offset to all elements if needed
+        if (offsetX !== 0 || offsetY !== 0) {
+            const constrainedBounds = new Map();
+            elementBounds.forEach((bounds, element) => {
+                constrainedBounds.set(element, {
+                    x: bounds.x + offsetX,
+                    y: bounds.y + offsetY,
+                    width: bounds.width,
+                    height: bounds.height
+                });
+            });
+            return constrainedBounds;
+        }
+        
+        return elementBounds;
     }
     
     // ===== ROTATION MOVE - WILL BE ENHANCED IN NEXT INCREMENT =====
