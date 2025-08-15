@@ -1,11 +1,16 @@
 /**
- * SelectionManager - Unified selection system for bubbles and text elements
+ * SelectionManager - Unified selection system with comprehensive grouping functionality
  */
 class SelectionManager {
     constructor() {
         // Core selection tracking
         this.selectedElements = new Map(); // element -> {type, data, element}
         this.elementRegistry = new Map(); // element -> {type, data}
+        
+        // Grouping system (NEW)
+        this.groups = new Map(); // groupId -> {elements: Set, createdAt: Date, name: string}
+        this.elementToGroup = new Map(); // element -> groupId
+        this.groupIdCounter = 0;
         
         // Event callbacks
         this.onSelectionChange = null;
@@ -34,7 +39,7 @@ class SelectionManager {
     }
     
     /**
-     * Handle element click for selection
+     * Handle element click for selection (UPDATED for group behavior)
      * @param {HTMLElement} element - Clicked element
      * @param {Event} event - Click event
      */
@@ -51,9 +56,35 @@ class SelectionManager {
         const elementInfo = this.elementRegistry.get(element);
         if (!elementInfo) return;
         
-        // Multi-selection with Shift key
-        if (event.shiftKey) {
-            this.toggleSelection(element, elementInfo.type, elementInfo.data);
+        // Check if element is part of a group
+        const groupId = this.getElementGroup(element);
+        
+        if (groupId && !event.shiftKey) {
+            // If element is grouped and not multi-selecting, select entire group
+            this.selectGroup(groupId);
+        } else if (event.shiftKey) {
+            // Multi-selection behavior
+            if (groupId) {
+                // If shift-clicking a grouped element, toggle the entire group
+                const groupMembers = this.getGroupMembers(groupId);
+                const isGroupSelected = groupMembers.every(member => this.isSelected(member));
+                
+                if (isGroupSelected) {
+                    // Deselect entire group
+                    groupMembers.forEach(member => this.removeFromSelection(member));
+                } else {
+                    // Select entire group
+                    groupMembers.forEach(member => {
+                        const memberInfo = this.elementRegistry.get(member);
+                        if (memberInfo) {
+                            this.addToSelection(member, memberInfo.type, memberInfo.data);
+                        }
+                    });
+                }
+            } else {
+                // Standard multi-selection for ungrouped elements
+                this.toggleSelection(element, elementInfo.type, elementInfo.data);
+            }
         } else {
             // Single selection - clear others first
             this.clearSelection();
@@ -176,8 +207,196 @@ class SelectionManager {
         return this.selectedElements.size > 0;
     }
     
+    // ===== GROUPING SYSTEM METHODS (NEW) =====
+    
     /**
-     * Apply visual highlighting to selected element
+     * Create a group from selected elements
+     * @param {Array} selectedElements - Array of elements to group
+     * @returns {string|null} - Group ID or null if failed
+     */
+    createGroup(selectedElements = null) {
+        const elementsToGroup = selectedElements || Array.from(this.selectedElements.keys());
+        
+        if (elementsToGroup.length < 2) {
+            console.warn('Cannot create group: need at least 2 elements');
+            return null;
+        }
+        
+        // Check if any elements are already grouped
+        const alreadyGrouped = elementsToGroup.some(element => this.isElementGrouped(element));
+        if (alreadyGrouped) {
+            console.warn('Cannot create group: some elements are already grouped');
+            return null;
+        }
+        
+        // Create new group
+        const groupId = `group_${++this.groupIdCounter}`;
+        const group = {
+            elements: new Set(elementsToGroup),
+            createdAt: new Date(),
+            name: `Group ${this.groupIdCounter}`
+        };
+        
+        this.groups.set(groupId, group);
+        
+        // Map elements to group
+        elementsToGroup.forEach(element => {
+            this.elementToGroup.set(element, groupId);
+        });
+        
+        // Update visual indicators
+        this.updateGroupVisuals(groupId, true);
+        
+        // Maintain selection on grouped elements
+        this.clearSelection();
+        elementsToGroup.forEach(element => {
+            const elementInfo = this.elementRegistry.get(element);
+            if (elementInfo) {
+                this.addToSelection(element, elementInfo.type, elementInfo.data);
+            }
+        });
+        
+        console.log(`Created group ${groupId} with ${elementsToGroup.length} elements`);
+        return groupId;
+    }
+    
+    /**
+     * Remove/dissolve a group
+     * @param {string} groupId - Group ID to remove
+     * @returns {boolean} - Success status
+     */
+    removeGroup(groupId) {
+        const group = this.groups.get(groupId);
+        if (!group) {
+            console.warn(`Group ${groupId} not found`);
+            return false;
+        }
+        
+        // Remove group visual indicators
+        this.updateGroupVisuals(groupId, false);
+        
+        // Remove element-to-group mappings
+        group.elements.forEach(element => {
+            this.elementToGroup.delete(element);
+        });
+        
+        // Remove group
+        this.groups.delete(groupId);
+        
+        console.log(`Removed group ${groupId}`);
+        return true;
+    }
+    
+    /**
+     * Get group ID for an element
+     * @param {HTMLElement} element 
+     * @returns {string|null}
+     */
+    getElementGroup(element) {
+        return this.elementToGroup.get(element) || null;
+    }
+    
+    /**
+     * Get all elements in a group
+     * @param {string} groupId 
+     * @returns {Array}
+     */
+    getGroupMembers(groupId) {
+        const group = this.groups.get(groupId);
+        return group ? Array.from(group.elements) : [];
+    }
+    
+    /**
+     * Check if element is part of any group
+     * @param {HTMLElement} element 
+     * @returns {boolean}
+     */
+    isElementGrouped(element) {
+        return this.elementToGroup.has(element);
+    }
+    
+    /**
+     * Select entire group by group ID
+     * @param {string} groupId 
+     */
+    selectGroup(groupId) {
+        const groupMembers = this.getGroupMembers(groupId);
+        if (groupMembers.length === 0) return;
+        
+        this.clearSelection();
+        
+        groupMembers.forEach(element => {
+            const elementInfo = this.elementRegistry.get(element);
+            if (elementInfo) {
+                this.addToSelection(element, elementInfo.type, elementInfo.data);
+            }
+        });
+    }
+    
+    /**
+     * Update visual indicators for group
+     * @param {string} groupId 
+     * @param {boolean} show - Show or hide group indicators
+     */
+    updateGroupVisuals(groupId, show) {
+        const groupMembers = this.getGroupMembers(groupId);
+        
+        groupMembers.forEach(element => {
+            if (show) {
+                element.classList.add('grouped');
+                element.style.boxShadow = '0 0 0 2px #9C27B0, 0 0 0 4px rgba(156, 39, 176, 0.3)';
+                element.style.borderRadius = '4px';
+            } else {
+                element.classList.remove('grouped');
+                element.style.boxShadow = '';
+                element.style.borderRadius = '';
+            }
+        });
+    }
+    
+    /**
+     * Get all selected groups (returns group IDs of groups that have selected members)
+     * @returns {Array} - Array of group IDs
+     */
+    getSelectedGroups() {
+        const selectedGroupIds = new Set();
+        
+        this.selectedElements.forEach((selectionItem, element) => {
+            const groupId = this.getElementGroup(element);
+            if (groupId) {
+                selectedGroupIds.add(groupId);
+            }
+        });
+        
+        return Array.from(selectedGroupIds);
+    }
+    
+    /**
+     * Check if current selection contains only grouped elements
+     * @returns {boolean}
+     */
+    isSelectionGrouped() {
+        if (this.selectedElements.size === 0) return false;
+        
+        return Array.from(this.selectedElements.keys()).every(element => 
+            this.isElementGrouped(element)
+        );
+    }
+    
+    /**
+     * Check if current selection can be grouped (2+ elements, none already grouped)
+     * @returns {boolean}
+     */
+    canCreateGroup() {
+        if (this.selectedElements.size < 2) return false;
+        
+        return !Array.from(this.selectedElements.keys()).some(element => 
+            this.isElementGrouped(element)
+        );
+    }
+    
+    /**
+     * Apply visual highlighting to selected element (UPDATED for group indicators)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
@@ -194,14 +413,16 @@ class SelectionManager {
                 }
             }
         } else if (type === 'text') {
-            // Text element highlighting
-            element.style.borderColor = '#2196F3';
-            element.style.background = 'rgba(33, 150, 243, 0.1)';
+            // Text element highlighting (don't override group styling)
+            if (!element.classList.contains('grouped')) {
+                element.style.borderColor = '#2196F3';
+                element.style.background = 'rgba(33, 150, 243, 0.1)';
+            }
         }
     }
     
     /**
-     * Remove visual highlighting from element
+     * Remove visual highlighting from element (UPDATED for group indicators)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
@@ -218,58 +439,16 @@ class SelectionManager {
                 }
             }
         } else if (type === 'text') {
-            element.style.borderColor = '';
-            element.style.background = '';
+            // Only remove text highlighting if element is not grouped
+            if (!element.classList.contains('grouped')) {
+                element.style.borderColor = '';
+                element.style.background = '';
+            }
         }
     }
     
     /**
-     * Link selected text to selected bubble
-     */
-    linkSelected() {
-        const selectedTexts = this.getSelectedByType('text');
-        const selectedBubbles = this.getSelectedByType('bubble');
-        
-        if (selectedTexts.length === 0 || selectedBubbles.length === 0) {
-            console.warn('Cannot link: need both text and bubble selected');
-            return false;
-        }
-        
-        // Use first selected bubble for linking
-        const targetBubble = selectedBubbles[0];
-        
-        // Link all selected text elements to the bubble
-        selectedTexts.forEach(textItem => {
-            if (window.editor?.textElementManager) {
-                window.editor.textElementManager.linkTextToBubble(
-                    textItem.element, 
-                    targetBubble.element
-                );
-            }
-        });
-        
-        this.notifySelectionChange();
-        return true;
-    }
-    
-    /**
-     * Unlink selected text elements
-     */
-    unlinkSelected() {
-        const selectedTexts = this.getSelectedByType('text');
-        
-        selectedTexts.forEach(textItem => {
-            if (window.editor?.textElementManager) {
-                window.editor.textElementManager.unlinkTextFromBubble(textItem.element);
-            }
-        });
-        
-        this.notifySelectionChange();
-        return true;
-    }
-    
-    /**
-     * Copy all selected elements
+     * Copy all selected elements (UPDATED for group handling)
      */
     copySelected() {
         const selectedBubbles = this.getSelectedByType('bubble');
@@ -305,21 +484,37 @@ class SelectionManager {
             }
         });
         
-        // Select the copied elements
-        if (copiedElements.length > 0) {
+        // If original selection was grouped, group the copies too
+        const selectedGroups = this.getSelectedGroups();
+        if (selectedGroups.length === 1 && copiedElements.length > 1) {
+            // Select the copied elements and group them
             this.clearSelection();
             copiedElements.forEach(item => {
                 this.addToSelection(item.element, item.type, item.data);
             });
+            
+            // Create group for copied elements
+            this.createGroup();
+        } else {
+            // Select the copied elements
+            if (copiedElements.length > 0) {
+                this.clearSelection();
+                copiedElements.forEach(item => {
+                    this.addToSelection(item.element, item.type, item.data);
+                });
+            }
         }
     }
     
     /**
-     * Delete all selected elements
+     * Delete all selected elements (UPDATED for group handling)
      */
     deleteSelected() {
         const selectedBubbles = this.getSelectedByType('bubble');
         const selectedTexts = this.getSelectedByType('text');
+        
+        // Get groups that will be affected
+        const affectedGroups = this.getSelectedGroups();
         
         // Store elements to delete to avoid modifying during iteration
         const elementsToDelete = [...this.selectedElements.keys()];
@@ -351,6 +546,14 @@ class SelectionManager {
             }
             // Clean up from selection manager
             this.cleanup(item.element);
+        });
+        
+        // Clean up any groups that no longer have members
+        affectedGroups.forEach(groupId => {
+            const remainingMembers = this.getGroupMembers(groupId);
+            if (remainingMembers.length === 0) {
+                this.removeGroup(groupId);
+            }
         });
     }
     
@@ -402,16 +605,20 @@ class SelectionManager {
             this.copySelected();
         }
         
-        // Ctrl+L - Link selected
+        // Ctrl+L - Group selected
         if (event.ctrlKey && event.key === 'l' && this.hasSelection()) {
             event.preventDefault();
-            this.linkSelected();
+            if (window.editor?.groupSelectedElements) {
+                window.editor.groupSelectedElements();
+            }
         }
         
-        // Ctrl+U - Unlink selected
+        // Ctrl+U - Ungroup selected
         if (event.ctrlKey && event.key === 'u' && this.hasSelection()) {
             event.preventDefault();
-            this.unlinkSelected();
+            if (window.editor?.ungroupSelectedElements) {
+                window.editor.ungroupSelectedElements();
+            }
         }
     }
     
@@ -436,8 +643,6 @@ class SelectionManager {
         }
         
         // FIXED: Call the correct method that exists in UIController
-        // OLD: window.editor.uiController.updateSelectionControls(this.selectedElements);
-        // NEW: Use forceUpdateBubbleControls() which actually exists
         try {
             if (window.editor?.uiController?.forceUpdateBubbleControls) {
                 window.editor.uiController.forceUpdateBubbleControls();
@@ -448,12 +653,30 @@ class SelectionManager {
     }
     
     /**
-     * Clean up when elements are removed
+     * Clean up when elements are removed (UPDATED for group handling)
      * @param {HTMLElement} element 
      */
     cleanup(element) {
+        // Remove from selection
         this.selectedElements.delete(element);
         this.elementRegistry.delete(element);
+        
+        // Remove from group if grouped
+        const groupId = this.getElementGroup(element);
+        if (groupId) {
+            const group = this.groups.get(groupId);
+            if (group) {
+                group.elements.delete(element);
+                
+                // If group becomes empty or has only 1 member, dissolve it
+                if (group.elements.size <= 1) {
+                    this.removeGroup(groupId);
+                }
+            }
+            
+            this.elementToGroup.delete(element);
+        }
+        
         this.notifySelectionChange();
     }
 }

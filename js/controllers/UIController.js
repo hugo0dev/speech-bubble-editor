@@ -1,5 +1,5 @@
 /**
- * UIController - Handles UI state management (Phase 3: Text Styling Controls)
+ * UIController - Handles UI state management (Phase 3: Text Styling Controls + Group Functionality)
  */
 class UIController {
     constructor(errorHandler) {
@@ -17,11 +17,11 @@ class UIController {
         this.isExporting = false;
         this.domElements = {};
         
-        // Text operation callbacks
+        // Text operation callbacks (updated terminology)
         this.onAddText = null;
         this.onDeleteText = null;
-        this.onLinkText = null;
-        this.onUnlinkText = null;
+        this.onGroupElements = null;
+        this.onUngroupElements = null;
         
         // Text styling callbacks (new)
         this.onTextStyleChange = null;
@@ -59,11 +59,11 @@ class UIController {
             exportBtn: document.getElementById('exportImageBtn'),
             addBtn: document.getElementById('addBubbleBtn'),
             
-            // Text controls
+            // Text controls (updated IDs)
             addTextBtn: document.getElementById('addTextBtn'),
             deleteTextBtn: document.getElementById('deleteTextBtn'),
-            linkTextBtn: document.getElementById('linkTextBtn'),
-            unlinkTextBtn: document.getElementById('unlinkTextBtn'),
+            groupElementsBtn: document.getElementById('groupElementsBtn'),
+            ungroupElementsBtn: document.getElementById('ungroupElementsBtn'),
             textCount: document.getElementById('textCount'),
             
             // Text styling controls (new)
@@ -119,7 +119,7 @@ class UIController {
     setupControlEventListeners() {
         const { 
             addBtn, copyBtn, deleteBtn, resetBtn, flipHorizontalBtn, flipVerticalBtn, exportBtn,
-            addTextBtn, deleteTextBtn, linkTextBtn, unlinkTextBtn,
+            addTextBtn, deleteTextBtn, groupElementsBtn, ungroupElementsBtn,
             fontFamilySelect, fontSizeInput, fontSizeUp, fontSizeDown,
             boldBtn, italicBtn, underlineBtn, strikethroughBtn, uppercaseBtn, shadowBtn, outlineBtn
         } = this.domElements;
@@ -160,7 +160,7 @@ class UIController {
             exportBtn.setAttribute('data-listener-added', 'true');
         }
         
-        // Text button listeners (unchanged)
+        // Text button listeners (updated)
         if (addTextBtn && !addTextBtn.hasAttribute('data-listener-added')) {
             addTextBtn.addEventListener('click', () => this.onAddTextClick());
             addTextBtn.setAttribute('data-listener-added', 'true');
@@ -171,14 +171,14 @@ class UIController {
             deleteTextBtn.setAttribute('data-listener-added', 'true');
         }
         
-        if (linkTextBtn && !linkTextBtn.hasAttribute('data-listener-added')) {
-            linkTextBtn.addEventListener('click', () => this.onLinkTextClick());
-            linkTextBtn.setAttribute('data-listener-added', 'true');
+        if (groupElementsBtn && !groupElementsBtn.hasAttribute('data-listener-added')) {
+            groupElementsBtn.addEventListener('click', () => this.onGroupElementsClick());
+            groupElementsBtn.setAttribute('data-listener-added', 'true');
         }
         
-        if (unlinkTextBtn && !unlinkTextBtn.hasAttribute('data-listener-added')) {
-            unlinkTextBtn.addEventListener('click', () => this.onUnlinkTextClick());
-            unlinkTextBtn.setAttribute('data-listener-added', 'true');
+        if (ungroupElementsBtn && !ungroupElementsBtn.hasAttribute('data-listener-added')) {
+            ungroupElementsBtn.addEventListener('click', () => this.onUngroupElementsClick());
+            ungroupElementsBtn.setAttribute('data-listener-added', 'true');
         }
         
         // Text styling listeners (new)
@@ -218,7 +218,7 @@ class UIController {
 
         const { 
             bubbleCount, copyBtn, deleteBtn, resetBtn, flipHorizontalBtn, flipVerticalBtn, exportBtn,
-            textCount, deleteTextBtn, linkTextBtn, unlinkTextBtn, textStylingPanel
+            textCount, deleteTextBtn, groupElementsBtn, ungroupElementsBtn, textStylingPanel
         } = this.domElements;
         
         // Existing bubble control logic (unchanged)
@@ -250,7 +250,7 @@ class UIController {
             exportBtn.textContent = this.isExporting ? 'Exporting...' : 'Export Image';
         }
         
-        // Text control logic
+        // Text control logic (updated)
         this.updateTextControls();
         
         // Text styling panel logic (new)
@@ -258,7 +258,7 @@ class UIController {
     }
     
     updateTextControls() {
-        const { textCount, deleteTextBtn, linkTextBtn, unlinkTextBtn } = this.domElements;
+        const { textCount, deleteTextBtn, groupElementsBtn, ungroupElementsBtn } = this.domElements;
         
         // Default values if no selection manager
         let selectedTexts = [];
@@ -281,23 +281,17 @@ class UIController {
         
         // Update text button states
         if (deleteTextBtn) {
-            deleteTextBtn.disabled = selectedTexts.length === 0;
+            deleteTextBtn.disabled = selectedTexts.length === 0 && selectedBubbles.length === 0;
         }
         
-        if (linkTextBtn) {
-            // Enable link button only when both text and bubble are selected
-            linkTextBtn.disabled = selectedTexts.length === 0 || selectedBubbles.length === 0;
+        // Group button logic: Enable when selection can be grouped
+        if (groupElementsBtn) {
+            groupElementsBtn.disabled = !this.selectionManager?.canCreateGroup();
         }
         
-        if (unlinkTextBtn) {
-            // Enable unlink button only when linked text is selected
-            let hasLinkedText = false;
-            if (this.textElementManager) {
-                hasLinkedText = selectedTexts.some(textItem => 
-                    this.textElementManager.isTextLinked?.(textItem.element)
-                );
-            }
-            unlinkTextBtn.disabled = !hasLinkedText;
+        // Ungroup button logic: Enable when grouped elements are selected
+        if (ungroupElementsBtn) {
+            ungroupElementsBtn.disabled = !this.selectionManager?.isSelectionGrouped();
         }
     }
     
@@ -525,13 +519,14 @@ class UIController {
         this.forceUpdateBubbleControls();
     }
     
-    onLinkTextClick() {
-        this.onLinkText?.();
+    // Updated group functionality handlers
+    onGroupElementsClick() {
+        this.onGroupElements?.();
         this.forceUpdateBubbleControls();
     }
     
-    onUnlinkTextClick() {
-        this.onUnlinkText?.();
+    onUngroupElementsClick() {
+        this.onUngroupElements?.();
         this.forceUpdateBubbleControls();
     }
 }

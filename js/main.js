@@ -1,5 +1,5 @@
 /**
- * Speech Bubble Editor - Main Entry Point (Updated with Text Integration)
+ * Speech Bubble Editor - Main Entry Point (Updated with Group Functionality)
  */
 class SpeechBubbleEditor {
     constructor() {
@@ -97,11 +97,11 @@ class SpeechBubbleEditor {
         this.uiController.onFlipVertical = () => this.flipSelectedBubbleVertical();
         this.uiController.onExport = () => this.exportImage();
         
-        // Text operation callbacks (new)
+        // Text operation callbacks (updated terminology)
         this.uiController.onAddText = () => this.addTextElement();
         this.uiController.onDeleteText = () => this.deleteSelectedText();
-        this.uiController.onLinkText = () => this.linkSelectedTextToBubble();
-        this.uiController.onUnlinkText = () => this.unlinkSelectedText();
+        this.uiController.onGroupElements = () => this.groupSelectedElements();
+        this.uiController.onUngroupElements = () => this.ungroupSelectedElements();
     }
     
     setupImageControllerCallbacks() {
@@ -242,7 +242,7 @@ class SpeechBubbleEditor {
         }
     }
     
-    // ===== NEW TEXT METHODS =====
+    // ===== TEXT METHODS =====
     addTextElement() {
         if (!this.isInitialized || !this.textElementManager) return null;
         
@@ -295,58 +295,72 @@ class SpeechBubbleEditor {
         }
     }
     
-    linkSelectedTextToBubble() {
-        if (!this.isInitialized || !this.selectionManager || !this.textElementManager) return false;
+    // ===== GROUP FUNCTIONALITY (Phase 2: Real Implementation) =====
+    groupSelectedElements() {
+        if (!this.isInitialized || !this.selectionManager) return false;
         
         try {
-            const selectedTexts = this.selectionManager.getSelectedByType('text');
-            const selectedBubbles = this.selectionManager.getSelectedByType('bubble');
-            
-            if (selectedTexts.length === 0 || selectedBubbles.length === 0) {
-                this.errorHandler.showUserError('Please select both text and a bubble to link them.');
+            // Check if grouping is possible
+            if (!this.selectionManager.canCreateGroup()) {
+                const selectedCount = this.selectionManager.getSelectionCount();
+                if (selectedCount < 2) {
+                    this.errorHandler.showUserError('Please select at least 2 elements to group them.');
+                } else {
+                    this.errorHandler.showUserError('Cannot group: some elements are already grouped.');
+                }
                 return false;
             }
             
-            // Use first selected bubble as the target
-            const targetBubble = selectedBubbles[0];
-            
-            // Link all selected text elements to the bubble
-            selectedTexts.forEach(textItem => {
-                this.textElementManager.linkTextToBubble(textItem.element, targetBubble.element);
-            });
-            
-            // Force UI update
-            this.uiController.forceUpdateBubbleControls();
-            
-            return true;
+            // Create the group
+            const groupId = this.selectionManager.createGroup();
+            if (groupId) {
+                const groupMembers = this.selectionManager.getGroupMembers(groupId);
+                this.errorHandler.showUserError(`Successfully grouped ${groupMembers.length} elements!`);
+                
+                // Force UI update
+                this.uiController.forceUpdateBubbleControls();
+                return true;
+            } else {
+                this.errorHandler.showUserError('Failed to create group.');
+                return false;
+            }
         } catch (error) {
-            this.errorHandler.handleError(error, 'Text-bubble linking');
+            this.errorHandler.handleError(error, 'Element grouping');
             return false;
         }
     }
     
-    unlinkSelectedText() {
-        if (!this.isInitialized || !this.selectionManager || !this.textElementManager) return false;
+    ungroupSelectedElements() {
+        if (!this.isInitialized || !this.selectionManager) return false;
         
         try {
-            const selectedTexts = this.selectionManager.getSelectedByType('text');
+            const selectedGroups = this.selectionManager.getSelectedGroups();
             
-            if (selectedTexts.length === 0) {
-                this.errorHandler.showUserError('Please select text elements to unlink.');
+            if (selectedGroups.length === 0) {
+                this.errorHandler.showUserError('Please select grouped elements to ungroup them.');
                 return false;
             }
             
-            // Unlink all selected text elements
-            selectedTexts.forEach(textItem => {
-                this.textElementManager.unlinkTextFromBubble(textItem.element);
+            let ungroupedCount = 0;
+            selectedGroups.forEach(groupId => {
+                const memberCount = this.selectionManager.getGroupMembers(groupId).length;
+                if (this.selectionManager.removeGroup(groupId)) {
+                    ungroupedCount += memberCount;
+                }
             });
             
-            // Force UI update
-            this.uiController.forceUpdateBubbleControls();
-            
-            return true;
+            if (ungroupedCount > 0) {
+                this.errorHandler.showUserError(`Successfully ungrouped ${ungroupedCount} elements!`);
+                
+                // Force UI update
+                this.uiController.forceUpdateBubbleControls();
+                return true;
+            } else {
+                this.errorHandler.showUserError('Failed to ungroup elements.');
+                return false;
+            }
         } catch (error) {
-            this.errorHandler.handleError(error, 'Text unlinking');
+            this.errorHandler.handleError(error, 'Element ungrouping');
             return false;
         }
     }

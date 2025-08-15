@@ -360,34 +360,34 @@ header h1 {
     flex-wrap: wrap;
 }
 
-.link-btn {
+.group-btn {
     background-color: #9C27B0;
     color: white;
 }
 
-.link-btn:hover:not(:disabled) {
+.group-btn:hover:not(:disabled) {
     background-color: #7B1FA2;
     transform: translateY(-1px);
 }
 
-.link-btn:disabled {
+.group-btn:disabled {
     background-color: #ccc;
     color: #666;
     cursor: not-allowed;
     transform: none;
 }
 
-.unlink-btn {
+.ungroup-btn {
     background-color: #FF9800;
     color: white;
 }
 
-.unlink-btn:hover:not(:disabled) {
+.ungroup-btn:hover:not(:disabled) {
     background-color: #F57C00;
     transform: translateY(-1px);
 }
 
-.unlink-btn:disabled {
+.ungroup-btn:disabled {
     background-color: #ccc;
     color: #666;
     cursor: not-allowed;
@@ -414,6 +414,76 @@ header h1 {
 .text-element.editing {
     opacity: 0.7;
     pointer-events: none;
+}
+
+/* ===== GROUP VISUAL INDICATORS (NEW) ===== */
+
+/* Grouped elements styling */
+.grouped {
+    position: relative;
+}
+
+.grouped::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border: 2px solid #9C27B0;
+    border-radius: 6px;
+    background: rgba(156, 39, 176, 0.1);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Group indicator icon */
+.grouped::after {
+    content: '⧉';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 16px;
+    height: 16px;
+    background: #9C27B0;
+    color: white;
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* Selected grouped elements have enhanced styling */
+.grouped.selected::before {
+    border-color: #7B1FA2;
+    background: rgba(123, 31, 162, 0.2);
+    box-shadow: 0 0 0 1px rgba(123, 31, 162, 0.5);
+}
+
+.grouped.selected::after {
+    background: #7B1FA2;
+    animation: groupPulse 2s infinite;
+}
+
+/* Group selection animation */
+@keyframes groupPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Ensure speech bubbles work well with group styling */
+.speech-bubble.grouped {
+    z-index: 11; /* Slightly higher than normal bubbles */
+}
+
+/* Text elements group styling adjustments */
+.text-element.grouped {
+    z-index: 51; /* Slightly higher than normal text */
 }
 
 /* ===== TEXT STYLING PANEL STYLES (NEW) ===== */

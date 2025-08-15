@@ -1,5 +1,5 @@
 /**
- * InteractionManager - Handles user interactions
+ * InteractionManager - Handles user interactions (Updated with Group Shortcuts)
  */
 class InteractionManager {
     constructor(canvasContainer, bubbleManager, handleManager, controlPointManager) {
@@ -495,17 +495,17 @@ class InteractionManager {
             return;
         }
         
-        // Ctrl+L - Link Text to Bubble
+        // Ctrl+L - Group Elements (updated from Link Text)
         if (event.ctrlKey && (event.key === 'l' || event.key === 'L') && !event.altKey) {
             event.preventDefault();
-            window.editor?.linkSelectedTextToBubble();
+            window.editor?.groupSelectedElements();
             return;
         }
         
-        // Ctrl+U - Unlink Text
+        // Ctrl+U - Ungroup Elements (updated from Unlink Text)
         if (event.ctrlKey && (event.key === 'u' || event.key === 'U') && !event.altKey) {
             event.preventDefault();
-            window.editor?.unlinkSelectedText();
+            window.editor?.ungroupSelectedElements();
             return;
         }
         
