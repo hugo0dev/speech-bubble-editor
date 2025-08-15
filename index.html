@@ -31,6 +31,15 @@
                 <button id="flipHorizontalBtn" class="control-btn flip-btn" disabled title="Flip Horizontal (H)">↔️ Flip H</button>
                 <button id="flipVerticalBtn" class="control-btn flip-btn" disabled title="Flip Vertical (V)">↕️ Flip V</button>
             </div>
+            
+            <!-- Text Controls Section (NEW) -->
+            <div class="text-controls">
+                <button id="addTextBtn" class="control-btn add-btn" title="Add Text (Ctrl+T)">Add Text</button>
+                <button id="deleteTextBtn" class="control-btn delete-btn" disabled title="Delete Selected Text (Del)">Delete Text</button>
+                <button id="linkTextBtn" class="control-btn link-btn" disabled title="Link Text to Bubble (Ctrl+L)">Link Text</button>
+                <button id="unlinkTextBtn" class="control-btn unlink-btn" disabled title="Unlink Text (Ctrl+U)">Unlink Text</button>
+            </div>
+            
             <div class="export-controls">
                 <button id="exportImageBtn" class="control-btn export-btn">Export Image</button>
                 <select id="exportFormat" class="export-format">
@@ -42,6 +51,7 @@
                 </select>
             </div>
             <span class="bubble-count" id="bubbleCount">Bubbles: 0</span>
+            <span class="text-count" id="textCount">Text: 0</span>
         </div>
         
         <div class="editor-area">
@@ -67,11 +77,17 @@
     <script src="js/controllers/UIController.js"></script>
     <script src="js/controllers/ImageController.js"></script>
     
-    <!-- 4. Manager modules (existing) -->
+    <!-- 4. Manager modules -->
+    <!-- Existing managers -->
     <script src="js/managers/ControlPointManager.js"></script>
     <script src="js/managers/HandleManager.js"></script>
     <script src="js/managers/BubbleManager.js"></script>
     <script src="js/managers/InteractionManager.js"></script>
+    
+    <!-- Text system managers (NEW) -->
+    <script src="js/managers/FontLoader.js"></script>
+    <script src="js/managers/TextElementManager.js"></script>
+    <script src="js/managers/SelectionManager.js"></script>
     
     <!-- 5. Main coordination class (lightweight entry point) -->
     <script src="js/main.js"></script>

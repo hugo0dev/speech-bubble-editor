@@ -450,10 +450,30 @@ class InteractionManager {
         }
     }
     
+    // UPDATED handleKeyDown method for InteractionManager.js:
+
     handleKeyDown(event) {
+        // DON'T PROCESS SHORTCUTS IF USER IS TYPING
+        // Check if user is typing in an input field or text editor is active
+        const isTyping = event.target.tagName === 'INPUT' || 
+                        event.target.tagName === 'TEXTAREA' ||
+                        event.target.isContentEditable ||
+                        document.querySelector('.text-editor-modal[style*="block"]'); // Text editor modal is visible
+        
+        if (isTyping) {
+            // Allow normal typing behavior, don't process shortcuts
+            // Exception: Still allow Escape to work in text editor
+            if (event.key === 'Escape') {
+                // Let the text editor handle Escape
+                return;
+            }
+            // For all other keys, let them work normally in the input
+            return;
+        }
+        
         const selectedBubble = this.bubbleManager.getSelectedBubble();
         
-        // Always intercept Ctrl+R to prevent page refresh
+        // Always intercept Ctrl+R to prevent page refresh (only when not typing)
         if (event.ctrlKey && (event.key === 'r' || event.key === 'R' || event.code === 'KeyR')) {
             event.preventDefault();
             event.stopPropagation();
@@ -465,6 +485,31 @@ class InteractionManager {
             }
             return;
         }
+        
+        // ===== NEW TEXT SHORTCUTS =====
+        
+        // Ctrl+T - Add Text
+        if (event.ctrlKey && (event.key === 't' || event.key === 'T') && !event.altKey) {
+            event.preventDefault();
+            window.editor?.addTextElement();
+            return;
+        }
+        
+        // Ctrl+L - Link Text to Bubble
+        if (event.ctrlKey && (event.key === 'l' || event.key === 'L') && !event.altKey) {
+            event.preventDefault();
+            window.editor?.linkSelectedTextToBubble();
+            return;
+        }
+        
+        // Ctrl+U - Unlink Text
+        if (event.ctrlKey && (event.key === 'u' || event.key === 'U') && !event.altKey) {
+            event.preventDefault();
+            window.editor?.unlinkSelectedText();
+            return;
+        }
+        
+        // ===== EXISTING BUBBLE SHORTCUTS (unchanged) =====
         
         // Flip horizontal with H key
         if ((event.key === 'h' || event.key === 'H') && selectedBubble && !event.ctrlKey && !event.altKey) {
@@ -482,9 +527,23 @@ class InteractionManager {
             return;
         }
         
-        if (event.key === 'Delete' && selectedBubble) {
+        // Delete key - Delete selected (bubbles or text)
+        if (event.key === 'Delete') {
             event.preventDefault();
-            window.editor?.deleteSelectedBubble() || this.bubbleManager.deleteBubble(selectedBubble);
+            
+            // Check if text is selected via selection manager
+            if (window.editor?.selectionManager) {
+                const selectedTexts = window.editor.selectionManager.getSelectedByType('text');
+                if (selectedTexts.length > 0) {
+                    window.editor.deleteSelectedText();
+                    return;
+                }
+            }
+            
+            // Fall back to bubble deletion
+            if (selectedBubble) {
+                window.editor?.deleteSelectedBubble() || this.bubbleManager.deleteBubble(selectedBubble);
+            }
             return;
         }
         

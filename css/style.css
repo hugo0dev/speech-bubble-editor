@@ -351,3 +351,68 @@ header h1 {
     -ms-user-select: none;
     user-select: none;
 }
+
+/* Text Controls Styles - Add these to the end of style.css */
+
+.text-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.link-btn {
+    background-color: #9C27B0;
+    color: white;
+}
+
+.link-btn:hover:not(:disabled) {
+    background-color: #7B1FA2;
+    transform: translateY(-1px);
+}
+
+.link-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.unlink-btn {
+    background-color: #FF9800;
+    color: white;
+}
+
+.unlink-btn:hover:not(:disabled) {
+    background-color: #F57C00;
+    transform: translateY(-1px);
+}
+
+.unlink-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.text-count {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+    padding: 8px 15px;
+    background-color: #e8f4fd;
+    border-radius: 20px;
+    border: 1px solid #2196F3;
+}
+
+/* Linked text visual indicator */
+.text-element.linked {
+    border: 2px dashed #9C27B0;
+    background-color: rgba(156, 39, 176, 0.1);
+}
+
+/* Text editing state */
+.text-element.editing {
+    opacity: 0.7;
+    pointer-events: none;
+}
