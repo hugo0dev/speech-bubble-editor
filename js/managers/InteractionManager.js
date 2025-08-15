@@ -773,9 +773,25 @@ class InteractionManager {
             return;
         }
         
-        if (event.ctrlKey && event.key === 'd' && selectedBubble) {
+        // Ctrl+D - Copy selected bubble or group
+        if (event.ctrlKey && event.key === 'd') {
             event.preventDefault();
-            window.editor?.copySelectedBubble() || this.bubbleManager.copyBubble(selectedBubble);
+            event.stopPropagation();
+            
+            // Check if we have group selection first
+            if (window.editor?.selectionManager) {
+                const selectionManager = window.editor.selectionManager;
+                if (selectionManager.hasSelection()) {
+                    // Use SelectionManager's copy functionality for groups and mixed selections
+                    selectionManager.copySelected();
+                    return;
+                }
+            }
+            
+            // Fall back to single bubble copy if no selection manager or no selection
+            if (selectedBubble) {
+                window.editor?.copySelectedBubble() || this.bubbleManager.copyBubble(selectedBubble);
+            }
             return;
         }
     }

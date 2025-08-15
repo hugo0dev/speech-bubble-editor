@@ -134,6 +134,11 @@ class TextElementManager {
         // Add to DOM
         this.canvasContainer.appendChild(element);
         
+        // FIXED: Register with SelectionManager immediately for proper multi-selection
+        if (window.selectionManager) {
+            window.selectionManager.registerElement(element, 'text', textData);
+        }
+        
         // Add event listeners for both selection and dragging
         this.addTextInteractionListeners(element);
         
@@ -521,17 +526,17 @@ class TextElementManager {
         // Add interaction listeners (IMPORTANT: This was missing)
         this.addTextInteractionListeners(newElement);
         
+        // FIXED: Register with SelectionManager properly for multi-selection
+        if (window.selectionManager) {
+            window.selectionManager.registerElement(newElement, 'text', newTextData);
+        }
+        
         // Apply decorations to the new element
         Object.entries(newTextData.decorations).forEach(([decoration, value]) => {
             if (value) {
                 this.applyTextDecoration(newElement, decoration, value);
             }
         });
-        
-        // Register with SelectionManager for UI updates
-        if (window.selectionManager) {
-            window.selectionManager.elementRegistry.set(newElement, { type: 'text', data: newTextData });
-        }
         
         return newElement;
     }
