@@ -1,5 +1,5 @@
 /**
- * TextElementManager - Fixed with proper editor positioning and drag support
+ * TextElementManager - Fixed with proper editor positioning and drag support (Updated for Group Movement)
  */
 class TextElementManager {
     constructor(canvasContainer, fontLoader) {
@@ -143,8 +143,10 @@ class TextElementManager {
         return element;
     }
 
+    // MODIFIED: Enhanced to coordinate with group dragging
     addTextInteractionListeners(textElement) {
         let isDragging = false;
+        let isGroupDrag = false;
         let dragStartX = 0;
         let dragStartY = 0;
         let dragOffsetX = 0;
@@ -173,11 +175,20 @@ class TextElementManager {
             
             // Set initial state
             isDragging = false;
+            isGroupDrag = false;
             
             // Handle selection immediately (before potential drag)
             this.handleTextSelection(textElement, e);
             
-            // Add temporary global event listeners for drag
+            // NEW: Check for group drag coordination with InteractionManager
+            const interactionManager = window.editor?.appCoordinator?.getManager('interactionManager');
+            
+            if (interactionManager) {
+                // Detect if this text element is part of a group
+                isGroupDrag = interactionManager.detectGroupDragStart(textElement);
+            }
+            
+            // Add temporary global event listeners for drag (both individual and group)
             const handleMouseMove = (e) => {
                 if (!isDragging) {
                     // Check if mouse moved enough to start dragging
@@ -186,22 +197,52 @@ class TextElementManager {
                     
                     if (deltaX > 3 || deltaY > 3) {
                         isDragging = true;
-                        textElement.style.opacity = '0.8';
-                        textElement.style.zIndex = '100';
-                        document.body.style.cursor = 'move';
+                        
+                        if (isGroupDrag) {
+                            // For group drag, set up InteractionManager state
+                            if (interactionManager) {
+                                interactionManager.isDragging = true;
+                                interactionManager.draggedElement = textElement;
+                                interactionManager.dragOffset = {
+                                    x: dragOffsetX,
+                                    y: dragOffsetY
+                                };
+                            }
+                        } else {
+                            // Individual text drag visual feedback
+                            textElement.style.opacity = '0.8';
+                            textElement.style.zIndex = '100';
+                            document.body.style.cursor = 'move';
+                        }
                     }
                 }
                 
                 if (isDragging) {
-                    this.performTextDrag(textElement, e, dragOffsetX, dragOffsetY);
+                    if (isGroupDrag && interactionManager) {
+                        // Let InteractionManager handle group movement
+                        const containerRect = interactionManager.canvasContainer.getBoundingClientRect();
+                        const newX = e.clientX - containerRect.left - dragOffsetX;
+                        const newY = e.clientY - containerRect.top - dragOffsetY;
+                        interactionManager.updateGroupPositions(newX, newY);
+                    } else {
+                        // Handle individual text drag
+                        this.performTextDrag(textElement, e, dragOffsetX, dragOffsetY);
+                    }
                 }
             };
             
             const handleMouseUp = (e) => {
-                // Clean up drag state
-                textElement.style.opacity = '1';
-                textElement.style.zIndex = '50';
-                document.body.style.cursor = '';
+                if (isGroupDrag && interactionManager) {
+                    // Clean up group drag
+                    interactionManager.cleanupGroupDrag();
+                    interactionManager.isDragging = false;
+                    interactionManager.draggedElement = null;
+                } else {
+                    // Clean up individual drag state
+                    textElement.style.opacity = '1';
+                    textElement.style.zIndex = '50';
+                    document.body.style.cursor = '';
+                }
                 
                 // Remove global event listeners
                 document.removeEventListener('mousemove', handleMouseMove);
@@ -209,6 +250,7 @@ class TextElementManager {
                 
                 // Reset drag state
                 isDragging = false;
+                isGroupDrag = false;
             };
             
             // Add global event listeners
@@ -221,6 +263,40 @@ class TextElementManager {
             e.stopPropagation();
             this.startEditing(textElement);
         });
+    }
+    
+    // NEW: Method to update text element position (used by group movement)
+    updateTextElementPosition(element, newX, newY) {
+        const textData = this.getTextDataByElement(element);
+        if (!textData) return;
+        
+        // Apply boundary constraints
+        const elementWidth = element.offsetWidth || 50;
+        const elementHeight = element.offsetHeight || 20;
+        const constrainedX = Math.max(0, Math.min(newX, this.canvasContainer.offsetWidth - elementWidth));
+        const constrainedY = Math.max(0, Math.min(newY, this.canvasContainer.offsetHeight - elementHeight));
+        
+        // Update visual position
+        element.style.left = constrainedX + 'px';
+        element.style.top = constrainedY + 'px';
+        
+        // Update internal data
+        textData.x = constrainedX;
+        textData.y = constrainedY;
+        
+        // If text is linked to bubble, update relative position
+        if (textData.linkedBubbleId) {
+            const bubbleData = this.getBubbleDataById(textData.linkedBubbleId);
+            if (bubbleData) {
+                const bubbleCenterX = bubbleData.x + bubbleData.width / 2;
+                const bubbleCenterY = bubbleData.y + bubbleData.height / 2;
+                
+                textData.relativePosition = {
+                    x: constrainedX - bubbleCenterX,
+                    y: constrainedY - bubbleCenterY
+                };
+            }
+        }
     }
     
     startEditing(element) {
@@ -386,9 +462,6 @@ class TextElementManager {
         }
     }
     
-    // UPDATE the copyTextElement method in TextElementManager.js
-// Replace the existing method with this version:
-
     copyTextElement(element) {
         const textData = this.getTextDataByElement(element);
         if (!textData) return null;
@@ -582,8 +655,8 @@ class TextElementManager {
         const textData = this.getTextDataByElement(textElement);
         if (!textData) return;
         
-        if (event.shiftKey) {
-            // Multi-selection with Shift
+        if (event.ctrlKey) {
+            // Multi-selection with Ctrl
             window.selectionManager.toggleSelection(textElement, 'text', textData);
         } else {
             // Single selection - clear others first
@@ -598,33 +671,8 @@ class TextElementManager {
         let newX = event.clientX - containerRect.left - dragOffsetX;
         let newY = event.clientY - containerRect.top - dragOffsetY;
         
-        // Constrain to container bounds
-        newX = Math.max(0, Math.min(newX, this.canvasContainer.offsetWidth - textElement.offsetWidth));
-        newY = Math.max(0, Math.min(newY, this.canvasContainer.offsetHeight - textElement.offsetHeight));
-        
-        textElement.style.left = newX + 'px';
-        textElement.style.top = newY + 'px';
-        
-        // Update text data
-        const textData = this.getTextDataByElement(textElement);
-        if (textData) {
-            textData.x = newX;
-            textData.y = newY;
-            
-            // Update relative position if linked to bubble
-            if (textData.linkedBubbleId) {
-                const bubbleData = this.getBubbleDataById(textData.linkedBubbleId);
-                if (bubbleData) {
-                    const bubbleCenterX = bubbleData.x + bubbleData.width / 2;
-                    const bubbleCenterY = bubbleData.y + bubbleData.height / 2;
-                    
-                    textData.relativePosition = {
-                        x: newX - bubbleCenterX,
-                        y: newY - bubbleCenterY
-                    };
-                }
-            }
-        }
+        // Use the updateTextElementPosition method for consistency
+        this.updateTextElementPosition(textElement, newX, newY);
     }
 }
 

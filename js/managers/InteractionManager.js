@@ -1,5 +1,5 @@
 /**
- * InteractionManager - Handles user interactions (Updated with Group Shortcuts)
+ * InteractionManager - Handles user interactions (Updated with Group Movement)
  */
 class InteractionManager {
     constructor(canvasContainer, bubbleManager, handleManager, controlPointManager) {
@@ -8,10 +8,16 @@ class InteractionManager {
         this.handleManager = handleManager;
         this.controlPointManager = controlPointManager;
         
-        // Drag state
+        // Existing drag state
         this.isDragging = false;
         this.draggedBubble = null;
         this.dragOffset = { x: 0, y: 0 };
+        
+        // NEW: Group drag state (exposed for TextElementManager coordination)
+        this.isGroupDrag = false;
+        this.groupMembers = [];
+        this.relativeOffsets = new Map(); // element -> {x: offsetX, y: offsetY}
+        this.draggedElement = null; // The element being directly dragged (exposed for text coordination)
         
         // Resize state
         this.isResizing = false;
@@ -36,6 +42,203 @@ class InteractionManager {
         this.deformationUpdateInterval = 16; // ~60fps
         
         this.initEventListeners();
+    }
+    
+    // NEW: Detect if dragged element is part of a group
+    detectGroupDragStart(element) {
+        // Get SelectionManager from global reference
+        const selectionManager = window.selectionManager || window.editor?.selectionManager;
+        if (!selectionManager) {
+            return false;
+        }
+        
+        // Check if element is part of a group
+        const groupId = selectionManager.getElementGroup(element);
+        if (!groupId) {
+            return false;
+        }
+        
+        // Get all group members
+        const groupMembers = selectionManager.getGroupMembers(groupId);
+        if (groupMembers.length < 2) {
+            return false; // Not really a group anymore
+        }
+        
+        // Store group drag state
+        this.isGroupDrag = true;
+        this.groupMembers = groupMembers;
+        this.draggedElement = element;
+        
+        // Calculate relative positions
+        this.relativeOffsets = this.calculateGroupRelativePositions(element, groupMembers);
+        
+        // Apply visual feedback
+        this.applyGroupDragVisualFeedback(groupMembers, true);
+        
+        console.log(`Group drag detected: ${groupMembers.length} members`);
+        return true;
+    }
+    
+    // NEW: Calculate relative positions between dragged element and group members
+    calculateGroupRelativePositions(draggedElement, groupMembers) {
+        const relativeOffsets = new Map();
+        
+        // Get dragged element position
+        const draggedPos = this.getElementPosition(draggedElement);
+        if (!draggedPos) {
+            return relativeOffsets;
+        }
+        
+        // Calculate relative offsets for each group member
+        groupMembers.forEach(member => {
+            if (member === draggedElement) {
+                return; // Skip the dragged element itself
+            }
+            
+            const memberPos = this.getElementPosition(member);
+            if (memberPos) {
+                const offset = {
+                    x: memberPos.x - draggedPos.x,
+                    y: memberPos.y - draggedPos.y
+                };
+                relativeOffsets.set(member, offset);
+            }
+        });
+        
+        return relativeOffsets;
+    }
+    
+    // NEW: Get element position (works for both bubbles and text)
+    getElementPosition(element) {
+        // Try to get bubble data first
+        const bubbleData = this.bubbleManager?.getBubbleData(element);
+        if (bubbleData) {
+            return { x: bubbleData.x, y: bubbleData.y };
+        }
+        
+        // Try to get text data
+        const textElementManager = window.editor?.textElementManager;
+        if (textElementManager) {
+            const textData = textElementManager.getTextDataByElement(element);
+            if (textData) {
+                return { x: textData.x, y: textData.y };
+            }
+        }
+        
+        // Fallback to element style (less reliable)
+        const x = parseFloat(element.style.left) || 0;
+        const y = parseFloat(element.style.top) || 0;
+        return { x, y };
+    }
+    
+    // NEW: Update positions for all group members
+    updateGroupPositions(newDraggedX, newDraggedY) {
+        if (!this.isGroupDrag || !this.draggedElement) {
+            return;
+        }
+        
+        // Update dragged element position first
+        this.updateElementPosition(this.draggedElement, newDraggedX, newDraggedY);
+        
+        // Update other group members using relative offsets
+        this.relativeOffsets.forEach((offset, member) => {
+            const newX = newDraggedX + offset.x;
+            const newY = newDraggedY + offset.y;
+            
+            // Apply boundary constraints
+            const constrainedPos = this.constrainToCanvas(member, newX, newY);
+            this.updateElementPosition(member, constrainedPos.x, constrainedPos.y);
+        });
+    }
+    
+    // NEW: Update element position (handles both bubbles and text)
+    updateElementPosition(element, newX, newY) {
+        // Try to update as bubble first
+        const bubbleData = this.bubbleManager?.getBubbleData(element);
+        if (bubbleData) {
+            bubbleData.x = newX;
+            bubbleData.y = newY;
+            element.style.left = newX + 'px';
+            element.style.top = newY + 'px';
+            
+            // Update handles if this is the main dragged element
+            if (element === this.draggedBubble || element === this.draggedElement) {
+                this.handleManager?.updateHandlePositions(element);
+            }
+            return;
+        }
+        
+        // Try to update as text element
+        const textElementManager = window.editor?.textElementManager;
+        if (textElementManager) {
+            const textData = textElementManager.getTextDataByElement(element);
+            if (textData) {
+                textElementManager.updateTextElementPosition(element, newX, newY);
+                return;
+            }
+        }
+        
+        // Fallback: update element style directly
+        element.style.left = newX + 'px';
+        element.style.top = newY + 'px';
+    }
+    
+    // NEW: Constrain element to canvas boundaries
+    constrainToCanvas(element, x, y) {
+        const elementWidth = element.offsetWidth || 50;
+        const elementHeight = element.offsetHeight || 50;
+        
+        const constrainedX = Math.max(0, Math.min(x, this.canvasContainer.offsetWidth - elementWidth));
+        const constrainedY = Math.max(0, Math.min(y, this.canvasContainer.offsetHeight - elementHeight));
+        
+        return { x: constrainedX, y: constrainedY };
+    }
+    
+    // NEW: Apply visual feedback during group drag
+    applyGroupDragVisualFeedback(groupMembers, isDragging) {
+        groupMembers.forEach(member => {
+            if (isDragging) {
+                member.style.opacity = '0.8';
+                member.style.zIndex = '100';
+                member.style.boxShadow = '0 0 0 2px #9C27B0, 0 0 8px rgba(156, 39, 176, 0.4)';
+            } else {
+                member.style.opacity = '1';
+                member.style.zIndex = '';
+                member.style.boxShadow = '';
+            }
+        });
+        
+        if (isDragging) {
+            this.canvasContainer.style.cursor = 'move';
+        } else {
+            this.canvasContainer.style.cursor = '';
+        }
+    }
+    
+    // NEW: Clean up group drag state
+    cleanupGroupDrag() {
+        if (!this.isGroupDrag) {
+            return;
+        }
+        
+        // Remove visual feedback
+        this.applyGroupDragVisualFeedback(this.groupMembers, false);
+        
+        // Update handles for any bubbles in the group
+        this.groupMembers.forEach(member => {
+            const bubbleData = this.bubbleManager?.getBubbleData(member);
+            if (bubbleData && this.handleManager) {
+                this.handleManager.updateHandlePositions(member);
+            }
+        });
+        
+        // Reset group drag state
+        this.isGroupDrag = false;
+        this.groupMembers = [];
+        this.relativeOffsets.clear();
+        this.draggedElement = null;
+        
+        console.log('Group drag cleanup completed');
     }
     
     initEventListeners() {
@@ -85,6 +288,7 @@ class InteractionManager {
         this.handleManager.updateControlPointHandlePositions(bubbleElement);
     }
     
+    // MODIFIED: Enhanced to support group dragging
     handleBubbleMouseDown(event, bubbleElement) {
         if (event.target.classList.contains('resize-handle') || 
             event.target.classList.contains('rotation-handle') ||
@@ -96,6 +300,9 @@ class InteractionManager {
         event.stopPropagation();
         
         this.bubbleManager.selectBubble(bubbleElement);
+        
+        // NEW: Check for group drag
+        const isGroupDrag = this.detectGroupDragStart(bubbleElement);
         
         this.isDragging = true;
         this.draggedBubble = bubbleElement;
@@ -119,8 +326,11 @@ class InteractionManager {
             this.dragOffset.y = event.clientY - bubbleRect.top;
         }
         
-        bubbleElement.style.opacity = '0.8';
-        bubbleElement.style.zIndex = '100';
+        // Apply visual feedback (already handled in group detection if it's a group)
+        if (!isGroupDrag) {
+            bubbleElement.style.opacity = '0.8';
+            bubbleElement.style.zIndex = '100';
+        }
     }
     
     handleResizeMouseDown(event, handlePosition, bubbleElement) {
@@ -271,6 +481,7 @@ class InteractionManager {
         this.lastDeformationUpdate = performance.now();
     }
     
+    // MODIFIED: Enhanced to support group dragging
     handleDragMove(event) {
         event.preventDefault();
         
@@ -279,21 +490,29 @@ class InteractionManager {
         let newX = event.clientX - containerRect.left - this.dragOffset.x;
         let newY = event.clientY - containerRect.top - this.dragOffset.y;
         
+        // Apply boundary constraints for the dragged element
         const bubbleWidth = this.draggedBubble.offsetWidth;
         const bubbleHeight = this.draggedBubble.offsetHeight;
         
         newX = Math.max(0, Math.min(newX, this.canvasContainer.offsetWidth - bubbleWidth));
         newY = Math.max(0, Math.min(newY, this.canvasContainer.offsetHeight - bubbleHeight));
         
-        this.draggedBubble.style.left = newX + 'px';
-        this.draggedBubble.style.top = newY + 'px';
-        
-        this.handleManager.updateHandlePositions(this.draggedBubble);
-        
-        const bubbleData = this.bubbleManager.getBubbleData(this.draggedBubble);
-        if (bubbleData) {
-            bubbleData.x = newX;
-            bubbleData.y = newY;
+        // NEW: Handle group vs individual dragging
+        if (this.isGroupDrag) {
+            // Update entire group
+            this.updateGroupPositions(newX, newY);
+        } else {
+            // Update individual element
+            this.draggedBubble.style.left = newX + 'px';
+            this.draggedBubble.style.top = newY + 'px';
+            
+            this.handleManager.updateHandlePositions(this.draggedBubble);
+            
+            const bubbleData = this.bubbleManager.getBubbleData(this.draggedBubble);
+            if (bubbleData) {
+                bubbleData.x = newX;
+                bubbleData.y = newY;
+            }
         }
     }
     
@@ -392,6 +611,7 @@ class InteractionManager {
         this.handleManager.updateHandlePositions(this.rotationBubble);
     }
     
+    // MODIFIED: Enhanced to handle group cleanup
     handleMouseUp(event) {
         if (this.isControlPointDragging) {
             if (this.controlPointBubble) {
@@ -418,9 +638,15 @@ class InteractionManager {
         }
         
         if (this.isDragging) {
-            if (this.draggedBubble) {
-                this.draggedBubble.style.opacity = '1';
-                this.draggedBubble.style.zIndex = Constants.BUBBLE_Z_INDEX;
+            // NEW: Handle group drag cleanup
+            if (this.isGroupDrag) {
+                this.cleanupGroupDrag();
+            } else {
+                // Individual bubble cleanup
+                if (this.draggedBubble) {
+                    this.draggedBubble.style.opacity = '1';
+                    this.draggedBubble.style.zIndex = Constants.BUBBLE_Z_INDEX;
+                }
             }
             
             this.isDragging = false;

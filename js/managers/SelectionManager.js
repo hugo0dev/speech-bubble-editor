@@ -1,5 +1,5 @@
 /**
- * SelectionManager - Unified selection system with comprehensive grouping functionality
+ * SelectionManager - Unified selection system with comprehensive grouping functionality (Updated for Ctrl+Click)
  */
 class SelectionManager {
     constructor() {
@@ -39,7 +39,7 @@ class SelectionManager {
     }
     
     /**
-     * Handle element click for selection (UPDATED for group behavior)
+     * Handle element click for selection (UPDATED for group behavior and Ctrl+click)
      * @param {HTMLElement} element - Clicked element
      * @param {Event} event - Click event
      */
@@ -59,13 +59,13 @@ class SelectionManager {
         // Check if element is part of a group
         const groupId = this.getElementGroup(element);
         
-        if (groupId && !event.shiftKey) {
+        if (groupId && !event.ctrlKey) {
             // If element is grouped and not multi-selecting, select entire group
             this.selectGroup(groupId);
-        } else if (event.shiftKey) {
-            // Multi-selection behavior
+        } else if (event.ctrlKey) {
+            // Multi-selection behavior with Ctrl
             if (groupId) {
-                // If shift-clicking a grouped element, toggle the entire group
+                // If ctrl-clicking a grouped element, toggle the entire group
                 const groupMembers = this.getGroupMembers(groupId);
                 const isGroupSelected = groupMembers.every(member => this.isSelected(member));
                 
@@ -571,14 +571,14 @@ class SelectionManager {
             }
         });
         
-        // Keyboard shortcuts
+        // Keyboard shortcuts (UPDATED for Ctrl+click behavior)
         document.addEventListener('keydown', (e) => {
             this.handleKeyboardShortcuts(e);
         });
     }
     
     /**
-     * Handle keyboard shortcuts
+     * Handle keyboard shortcuts (UPDATED for Ctrl+click behavior)
      * @param {KeyboardEvent} event 
      */
     handleKeyboardShortcuts(event) {
