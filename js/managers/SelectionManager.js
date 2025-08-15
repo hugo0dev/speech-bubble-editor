@@ -1,5 +1,5 @@
 /**
- * SelectionManager - Unified selection system with comprehensive grouping functionality (Updated for Ctrl+Click)
+ * SelectionManager - Unified selection system with comprehensive grouping functionality (FIXED Multi-selection Visual Feedback)
  */
 class SelectionManager {
     constructor() {
@@ -7,7 +7,7 @@ class SelectionManager {
         this.selectedElements = new Map(); // element -> {type, data, element}
         this.elementRegistry = new Map(); // element -> {type, data}
         
-        // Grouping system (NEW)
+        // Grouping system
         this.groups = new Map(); // groupId -> {elements: Set, createdAt: Date, name: string}
         this.elementToGroup = new Map(); // element -> groupId
         this.groupIdCounter = 0;
@@ -39,7 +39,7 @@ class SelectionManager {
     }
     
     /**
-     * Handle element click for selection (UPDATED for group behavior and Ctrl+click)
+     * Handle element click for selection (group behavior and Ctrl+click)
      * @param {HTMLElement} element - Clicked element
      * @param {Event} event - Click event
      */
@@ -93,7 +93,7 @@ class SelectionManager {
     }
     
     /**
-     * Add element to selection
+     * Add element to selection (FIXED to update all selection visuals)
      * @param {HTMLElement} element 
      * @param {string} type 
      * @param {Object} data 
@@ -104,8 +104,9 @@ class SelectionManager {
         const selectionItem = { element, type, data };
         this.selectedElements.set(element, selectionItem);
         
-        // Apply visual selection
-        this.highlightElement(element, type);
+        // FIXED: Update visual highlighting for ALL selected elements
+        // This ensures multi-selection indicators appear correctly
+        this.refreshAllSelectionVisuals();
         
         // Notify UI of selection change
         this.notifySelectionChange();
@@ -114,22 +115,37 @@ class SelectionManager {
     }
     
     /**
-     * Remove element from selection
+     * Remove element from selection (FIXED to update all selection visuals)
      * @param {HTMLElement} element 
      */
     removeFromSelection(element) {
         if (!this.selectedElements.has(element)) return false;
         
-        const selectionItem = this.selectedElements.get(element);
         this.selectedElements.delete(element);
         
-        // Remove visual selection
-        this.unhighlightElement(element, selectionItem.type);
+        // FIXED: Update visual highlighting for ALL remaining selected elements
+        this.refreshAllSelectionVisuals();
         
         // Notify UI of selection change
         this.notifySelectionChange();
         
         return true;
+    }
+    
+    /**
+     * NEW: Refresh visual highlighting for all selected elements
+     * This ensures proper multi-selection and group indicators
+     */
+    refreshAllSelectionVisuals() {
+        // First, clear all highlighting
+        this.selectedElements.forEach((selectionItem, element) => {
+            this.unhighlightElement(element, selectionItem.type);
+        });
+        
+        // Then, re-apply highlighting with correct multi-selection state
+        this.selectedElements.forEach((selectionItem, element) => {
+            this.highlightElement(element, selectionItem.type);
+        });
     }
     
     /**
@@ -207,7 +223,7 @@ class SelectionManager {
         return this.selectedElements.size > 0;
     }
     
-    // ===== GROUPING SYSTEM METHODS (NEW) =====
+    // ===== GROUPING SYSTEM METHODS =====
     
     /**
      * Create a group from selected elements or merge with existing groups
@@ -222,7 +238,7 @@ class SelectionManager {
             return null;
         }
         
-        // FIXED: Allow grouping of already grouped elements (merge groups)
+        // Allow grouping of already grouped elements (merge groups)
         const existingGroups = new Set();
         const ungroupedElements = [];
         
@@ -362,7 +378,7 @@ class SelectionManager {
     }
     
     /**
-     * Update visual indicators for group (FIXED - no permanent indicators)
+     * Update visual indicators for group (no permanent indicators)
      * @param {string} groupId 
      * @param {boolean} show - Show or hide group indicators
      */
@@ -419,19 +435,19 @@ class SelectionManager {
     canCreateGroup() {
         if (this.selectedElements.size < 2) return false;
         
-        // FIXED: Always allow grouping if we have 2+ elements (including already grouped ones for merging)
+        // Always allow grouping if we have 2+ elements (including already grouped ones for merging)
         return true;
     }
     
     /**
-     * Apply visual highlighting to selected element (ENHANCED multi-selection indicators)
+     * Apply visual highlighting to selected element (ENHANCED with FIXED multi-selection indicators)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
     highlightElement(element, type) {
         element.classList.add('selected');
         
-        // Check if this is part of a multi-selection
+        // FIXED: Check multi-selection state based on CURRENT selection size
         const isMultiSelection = this.selectedElements.size > 1;
         const isGrouped = this.isElementGrouped(element);
         
@@ -444,7 +460,7 @@ class SelectionManager {
                 member.style.transition = 'box-shadow 0.2s ease';
             });
         } else if (isMultiSelection) {
-            // For multi-selection: use consistent indicators for both bubbles and text
+            // FIXED: For multi-selection, use blue indicators for all selected elements
             element.style.boxShadow = '0 0 0 3px #2196F3, 0 0 8px rgba(33, 150, 243, 0.6)';
             element.style.transition = 'box-shadow 0.2s ease';
         }
@@ -530,7 +546,7 @@ class SelectionManager {
     }
     
     /**
-     * Copy all selected elements (UPDATED for group handling)
+     * Copy all selected elements (group handling)
      */
     copySelected() {
         const selectedBubbles = this.getSelectedByType('bubble');
@@ -589,7 +605,7 @@ class SelectionManager {
     }
     
     /**
-     * Delete all selected elements (UPDATED for group handling)
+     * Delete all selected elements (group handling)
      */
     deleteSelected() {
         const selectedBubbles = this.getSelectedByType('bubble');
@@ -653,14 +669,14 @@ class SelectionManager {
             }
         });
         
-        // Keyboard shortcuts (UPDATED for Ctrl+click behavior)
+        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             this.handleKeyboardShortcuts(e);
         });
     }
     
     /**
-     * Handle keyboard shortcuts (FIXED - removed Ctrl+D to prevent duplicates)
+     * Handle keyboard shortcuts
      * @param {KeyboardEvent} event 
      */
     handleKeyboardShortcuts(event) {
@@ -680,8 +696,6 @@ class SelectionManager {
             event.preventDefault();
             this.deleteSelected();
         }
-        
-        // NOTE: Ctrl+D (copy) is handled in InteractionManager to prevent duplicates
         
         // Ctrl+L - Group selected
         if (event.ctrlKey && event.key === 'l' && this.hasSelection()) {
@@ -712,7 +726,7 @@ class SelectionManager {
     }
     
     /**
-     * Notify UI controller of selection changes - FIXED METHOD
+     * Notify UI controller of selection changes
      */
     notifySelectionChange() {
         // Call onSelectionChange callback if available
@@ -720,7 +734,7 @@ class SelectionManager {
             this.onSelectionChange(this.selectedElements);
         }
         
-        // FIXED: Call the correct method that exists in UIController
+        // Call the correct method that exists in UIController
         try {
             if (window.editor?.uiController?.forceUpdateBubbleControls) {
                 window.editor.uiController.forceUpdateBubbleControls();
@@ -731,7 +745,7 @@ class SelectionManager {
     }
     
     /**
-     * Clean up when elements are removed (UPDATED for group handling)
+     * Clean up when elements are removed (group handling)
      * @param {HTMLElement} element 
      */
     cleanup(element) {
