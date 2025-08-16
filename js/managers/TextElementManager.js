@@ -1,5 +1,5 @@
 /**
- * TextElementManager - Fixed with proper editor positioning and drag support (Updated for Group Movement)
+ * TextElementManager - Fixed with simplified interaction (REMOVED duplicate drag logic)
  */
 class TextElementManager {
     constructor(canvasContainer, fontLoader) {
@@ -44,7 +44,6 @@ class TextElementManager {
         `;
         
         this.editorModal.appendChild(this.editorInput);
-        // Append to canvas container instead of body for proper positioning
         this.canvasContainer.appendChild(this.editorModal);
         
         // Editor event listeners
@@ -108,8 +107,8 @@ class TextElementManager {
             padding: '8px',
             whiteSpace: 'nowrap',
             transformOrigin: 'center center',
-            userSelect: 'none', // Prevent text selection during drag
-            pointerEvents: 'all' // Ensure element receives pointer events
+            userSelect: 'none',
+            pointerEvents: 'all'
         });
         
         // Create data structure
@@ -134,12 +133,12 @@ class TextElementManager {
         // Add to DOM
         this.canvasContainer.appendChild(element);
         
-        // FIXED: Register with SelectionManager immediately for proper multi-selection
+        // Register with SelectionManager immediately
         if (window.selectionManager) {
             window.selectionManager.registerElement(element, 'text', textData);
         }
         
-        // Add event listeners for both selection and dragging
+        // SIMPLIFIED: Add only essential interaction listeners (NO DRAG LOGIC)
         this.addTextInteractionListeners(element);
         
         // Start editing immediately for new text
@@ -148,119 +147,25 @@ class TextElementManager {
         return element;
     }
 
-    // MODIFIED: Enhanced to coordinate with group dragging
+    // FIXED: Simplified interaction - removed all drag logic, drag now handled by InteractionManager
     addTextInteractionListeners(textElement) {
-        let isDragging = false;
-        let isGroupDrag = false;
-        let dragStartX = 0;
-        let dragStartY = 0;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
+        /*
+        LOGIC PLAN:
+        1. Add click handler for selection (not drag)
+        2. Add double-click handler for editing
+        3. Remove all drag logic - InteractionManager handles this now
+        4. Keep editing protection
+        */
         
-        // Mouse down - start potential drag or selection
-        textElement.addEventListener('mousedown', (e) => {
+        // Click for selection only (drag handled by InteractionManager)
+        textElement.addEventListener('click', (e) => {
             // Don't interfere if editing
             if (textElement.classList.contains('editing')) {
                 return;
             }
             
-            e.preventDefault();
             e.stopPropagation();
-            
-            // Store drag start position
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-            
-            // Get current element position
-            const rect = textElement.getBoundingClientRect();
-            const containerRect = this.canvasContainer.getBoundingClientRect();
-            
-            dragOffsetX = e.clientX - rect.left;
-            dragOffsetY = e.clientY - rect.top;
-            
-            // Set initial state
-            isDragging = false;
-            isGroupDrag = false;
-            
-            // Handle selection immediately (before potential drag)
-            this.handleTextSelection(textElement, e);
-            
-            // NEW: Check for group drag coordination with InteractionManager
-            const interactionManager = window.editor?.appCoordinator?.getManager('interactionManager');
-            
-            if (interactionManager) {
-                // Detect if this text element is part of a group
-                isGroupDrag = interactionManager.detectGroupDragStart(textElement);
-            }
-            
-            // Add temporary global event listeners for drag (both individual and group)
-            const handleMouseMove = (e) => {
-                if (!isDragging) {
-                    // Check if mouse moved enough to start dragging
-                    const deltaX = Math.abs(e.clientX - dragStartX);
-                    const deltaY = Math.abs(e.clientY - dragStartY);
-                    
-                    if (deltaX > 3 || deltaY > 3) {
-                        isDragging = true;
-                        
-                        if (isGroupDrag) {
-                            // For group drag, set up InteractionManager state
-                            if (interactionManager) {
-                                interactionManager.isDragging = true;
-                                interactionManager.draggedElement = textElement;
-                                interactionManager.dragOffset = {
-                                    x: dragOffsetX,
-                                    y: dragOffsetY
-                                };
-                            }
-                        } else {
-                            // Individual text drag visual feedback
-                            textElement.style.opacity = '0.8';
-                            textElement.style.zIndex = '100';
-                            document.body.style.cursor = 'move';
-                        }
-                    }
-                }
-                
-                if (isDragging) {
-                    if (isGroupDrag && interactionManager) {
-                        // Let InteractionManager handle group movement
-                        const containerRect = interactionManager.canvasContainer.getBoundingClientRect();
-                        const newX = e.clientX - containerRect.left - dragOffsetX;
-                        const newY = e.clientY - containerRect.top - dragOffsetY;
-                        interactionManager.updateGroupPositions(newX, newY);
-                    } else {
-                        // Handle individual text drag
-                        this.performTextDrag(textElement, e, dragOffsetX, dragOffsetY);
-                    }
-                }
-            };
-            
-            const handleMouseUp = (e) => {
-                if (isGroupDrag && interactionManager) {
-                    // Clean up group drag
-                    interactionManager.cleanupGroupDrag();
-                    interactionManager.isDragging = false;
-                    interactionManager.draggedElement = null;
-                } else {
-                    // Clean up individual drag state
-                    textElement.style.opacity = '1';
-                    textElement.style.zIndex = '50';
-                    document.body.style.cursor = '';
-                }
-                
-                // Remove global event listeners
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-                
-                // Reset drag state
-                isDragging = false;
-                isGroupDrag = false;
-            };
-            
-            // Add global event listeners
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+            // Selection is handled by InteractionManager now
         });
         
         // Double-click for editing
@@ -270,8 +175,17 @@ class TextElementManager {
         });
     }
     
-    // NEW: Method to update text element position (used by group movement)
+    // Method used by InteractionManager for group movement (KEEP THIS)
     updateTextElementPosition(element, newX, newY) {
+        /*
+        LOGIC PLAN:
+        1. Get text data for the element
+        2. Apply boundary constraints to prevent element going off-canvas
+        3. Update visual position (element.style)
+        4. Update internal data tracking
+        5. Update linked bubble relative position if applicable
+        */
+        
         const textData = this.getTextDataByElement(element);
         if (!textData) return;
         
@@ -523,10 +437,10 @@ class TextElementManager {
         // Add to DOM
         this.canvasContainer.appendChild(newElement);
         
-        // Add interaction listeners (IMPORTANT: This was missing)
+        // Add interaction listeners
         this.addTextInteractionListeners(newElement);
         
-        // FIXED: Register with SelectionManager properly for multi-selection
+        // Register with SelectionManager
         if (window.selectionManager) {
             window.selectionManager.registerElement(newElement, 'text', newTextData);
         }
@@ -652,32 +566,6 @@ class TextElementManager {
     isTextLinked(element) {
         const textData = this.getTextDataByElement(element);
         return textData?.linkedBubbleId !== null && textData?.linkedBubbleId !== undefined;
-    }
-
-    handleTextSelection(textElement, event) {
-        if (!window.selectionManager) return;
-        
-        const textData = this.getTextDataByElement(textElement);
-        if (!textData) return;
-        
-        if (event.ctrlKey) {
-            // Multi-selection with Ctrl
-            window.selectionManager.toggleSelection(textElement, 'text', textData);
-        } else {
-            // Single selection - clear others first
-            window.selectionManager.clearSelection();
-            window.selectionManager.addToSelection(textElement, 'text', textData);
-        }
-    }
-
-    performTextDrag(textElement, event, dragOffsetX, dragOffsetY) {
-        const containerRect = this.canvasContainer.getBoundingClientRect();
-        
-        let newX = event.clientX - containerRect.left - dragOffsetX;
-        let newY = event.clientY - containerRect.top - dragOffsetY;
-        
-        // Use the updateTextElementPosition method for consistency
-        this.updateTextElementPosition(textElement, newX, newY);
     }
 }
 
