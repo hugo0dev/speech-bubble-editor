@@ -1,5 +1,5 @@
 /**
- * InteractionManager - Handles user interactions (FIXED: Unified Text and Bubble Handling)
+ * InteractionManager - Handles user interactions (FIXED: Control Point Selection Preservation)
  */
 class InteractionManager {
     constructor(canvasContainer, bubbleManager, handleManager, controlPointManager) {
@@ -45,12 +45,111 @@ class InteractionManager {
         this.controlPointDirection = null;
         this.controlPointStartData = null;
         
+        // Selection preservation state for control point operations
+        this.storedSelectionState = null;
+        this.isSelectionPreservationActive = false;
+        
         // Deformation optimization
         this.deformationThrottle = null;
         this.lastDeformationUpdate = 0;
         this.deformationUpdateInterval = 16; // ~60fps
         
         this.initEventListeners();
+    }
+    
+    // ===== SELECTION PRESERVATION METHODS (NEW) =====
+    
+    /**
+     * Store current selection state before control point operations
+     */
+    storeSelectionStateForControlPoint() {
+        const selectionManager = window.selectionManager || window.editor?.selectionManager;
+        if (!selectionManager || !selectionManager.hasSelection()) {
+            this.storedSelectionState = null;
+            this.isSelectionPreservationActive = false;
+            return;
+        }
+        
+        try {
+            // Capture current selection state
+            const selectedElements = selectionManager.getSelectedElements();
+            this.storedSelectionState = [];
+            
+            selectedElements.forEach((selectionItem, element) => {
+                // Store essential data for restoration
+                this.storedSelectionState.push({
+                    element: element,
+                    type: selectionItem.type,
+                    data: selectionItem.data
+                });
+            });
+            
+            this.isSelectionPreservationActive = true;
+            console.log('Stored selection state for control point operation:', this.storedSelectionState.length, 'elements');
+            
+        } catch (error) {
+            console.warn('Failed to store selection state for control point operation:', error);
+            this.clearStoredSelectionState();
+        }
+    }
+    
+    /**
+     * Restore selection state after control point operations
+     */
+    restoreSelectionStateAfterControlPoint() {
+        if (!this.isSelectionPreservationActive || !this.storedSelectionState) {
+            return;
+        }
+        
+        const selectionManager = window.selectionManager || window.editor?.selectionManager;
+        if (!selectionManager) {
+            console.warn('SelectionManager not available for selection restoration');
+            this.clearStoredSelectionState();
+            return;
+        }
+        
+        try {
+            console.log('Restoring selection state after control point operation');
+            
+            // Clear current selection first to avoid conflicts
+            selectionManager.clearSelection();
+            
+            // Restore each element that was previously selected
+            let restoredCount = 0;
+            this.storedSelectionState.forEach(selectionItem => {
+                try {
+                    // Verify element still exists and is valid
+                    if (selectionItem.element && 
+                        document.contains(selectionItem.element) && 
+                        selectionManager.elementRegistry.has(selectionItem.element)) {
+                        
+                        selectionManager.addToSelection(
+                            selectionItem.element, 
+                            selectionItem.type, 
+                            selectionItem.data
+                        );
+                        restoredCount++;
+                    }
+                } catch (elementError) {
+                    console.warn('Failed to restore selection for individual element:', elementError);
+                }
+            });
+            
+            console.log('Successfully restored selection for', restoredCount, 'of', this.storedSelectionState.length, 'elements');
+            
+        } catch (error) {
+            console.warn('Failed to restore selection state after control point operation:', error);
+        } finally {
+            this.clearStoredSelectionState();
+        }
+    }
+    
+    /**
+     * Clear stored selection state (cleanup method)
+     */
+    clearStoredSelectionState() {
+        this.storedSelectionState = null;
+        this.isSelectionPreservationActive = false;
     }
     
     // ===== GROUP TRANSFORMATION DETECTION FUNCTIONS =====
@@ -769,11 +868,14 @@ class InteractionManager {
         }
     }
     
-    // ===== CONTROL POINT HANDLING =====
+    // ===== CONTROL POINT HANDLING (UPDATED WITH SELECTION PRESERVATION) =====
     
     handleControlPointMouseDown(event, direction, bubbleElement) {
         event.preventDefault();
         event.stopPropagation();
+        
+        // FIXED: Store selection state before control point operation
+        this.storeSelectionStateForControlPoint();
         
         this.isControlPointDragging = true;
         this.controlPointBubble = bubbleElement;
@@ -1164,7 +1266,7 @@ class InteractionManager {
         this.handleManager.updateHandlePositions(this.rotationBubble);
     }
     
-    // ===== MOUSE UP HANDLING =====
+    // ===== MOUSE UP HANDLING (UPDATED WITH SELECTION PRESERVATION) =====
     
     handleMouseUp(event) {
         if (this.isControlPointDragging) {
@@ -1184,6 +1286,12 @@ class InteractionManager {
                 cancelAnimationFrame(this.deformationThrottle);
                 this.deformationThrottle = null;
             }
+            
+            // FIXED: Restore selection state after control point operation
+            // Add small delay to ensure all cleanup is complete before restoring selection
+            setTimeout(() => {
+                this.restoreSelectionStateAfterControlPoint();
+            }, 10);
             
             this.isControlPointDragging = false;
             this.controlPointBubble = null;
@@ -1257,6 +1365,10 @@ class InteractionManager {
         
         if (isTyping) {
             if (event.key === 'Escape') {
+                // Add escape handling for control point operations
+                if (this.isControlPointDragging) {
+                    this.cancelControlPointOperation();
+                }
                 return;
             }
             return;
@@ -1324,6 +1436,14 @@ class InteractionManager {
             return;
         }
         
+        if (event.key === 'Escape') {
+            // Handle escape key for control point operations
+            if (this.isControlPointDragging) {
+                this.cancelControlPointOperation();
+            }
+            return;
+        }
+        
         if (event.ctrlKey && event.key === 'd') {
             event.preventDefault();
             event.stopPropagation();
@@ -1341,6 +1461,36 @@ class InteractionManager {
             }
             return;
         }
+    }
+    
+    /**
+     * Cancel control point operation (e.g., on Escape key)
+     */
+    cancelControlPointOperation() {
+        if (!this.isControlPointDragging) return;
+        
+        console.log('Cancelling control point operation');
+        
+        // Clean up visual state
+        if (this.controlPointBubble && this.controlPointDirection) {
+            const handle = this.controlPointBubble.controlPointHandles?.querySelector(`.control-point-${this.controlPointDirection}`);
+            this.setControlPointDragVisualState(false, handle);
+        }
+        
+        // Clean up throttled operations
+        if (this.deformationThrottle) {
+            cancelAnimationFrame(this.deformationThrottle);
+            this.deformationThrottle = null;
+        }
+        
+        // Restore selection state
+        this.restoreSelectionStateAfterControlPoint();
+        
+        // Reset control point state
+        this.isControlPointDragging = false;
+        this.controlPointBubble = null;
+        this.controlPointDirection = null;
+        this.controlPointStartData = null;
     }
     
     setControlPointDragVisualState(isDragging, handle) {
