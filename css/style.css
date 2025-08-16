@@ -351,3 +351,295 @@ header h1 {
     -ms-user-select: none;
     user-select: none;
 }
+
+/* Text Controls Styles */
+.text-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.group-btn {
+    background-color: #9C27B0;
+    color: white;
+}
+
+.group-btn:hover:not(:disabled) {
+    background-color: #7B1FA2;
+    transform: translateY(-1px);
+}
+
+.group-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.ungroup-btn {
+    background-color: #FF9800;
+    color: white;
+}
+
+.ungroup-btn:hover:not(:disabled) {
+    background-color: #F57C00;
+    transform: translateY(-1px);
+}
+
+.ungroup-btn:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.text-count {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+    padding: 8px 15px;
+    background-color: #e8f4fd;
+    border-radius: 20px;
+    border: 1px solid #2196F3;
+}
+
+/* Linked text visual indicator */
+.text-element.linked {
+    border: 2px dashed #9C27B0;
+    background-color: rgba(156, 39, 176, 0.1);
+}
+
+/* Text editing state */
+.text-element.editing {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* ===== GROUP VISUAL INDICATORS (UPDATED - NO PERMANENT INDICATORS) ===== */
+
+/* Grouped elements styling - NO VISUAL INDICATORS when unselected */
+.grouped {
+    position: relative;
+    /* No visual indicators - only used for internal tracking */
+}
+
+/* Ensure speech bubbles work well with group styling */
+.speech-bubble.grouped {
+    z-index: 11; /* Slightly higher than normal bubbles */
+}
+
+/* Text elements group styling adjustments */
+.text-element.grouped {
+    z-index: 51; /* Slightly higher than normal text */
+}
+
+/* ===== TEXT STYLING PANEL STYLES (NEW) ===== */
+
+.text-styling-panel {
+    width: 100%;
+    max-width: 600px;
+    margin: 15px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    border: 2px solid #2196F3;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+    display: none; /* Hidden by default */
+}
+
+.text-styling-panel.active {
+    display: block;
+}
+
+.styling-panel-title {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2196F3;
+    text-align: center;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+.styling-section {
+    margin-bottom: 15px;
+}
+
+.styling-section:last-child {
+    margin-bottom: 0;
+}
+
+.styling-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+/* Font Controls */
+.font-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.font-family-select {
+    flex: 1;
+    min-width: 120px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+}
+
+.font-family-select:focus {
+    outline: none;
+    border-color: #2196F3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.font-size-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.font-size-input {
+    width: 60px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.font-size-input:focus {
+    outline: none;
+    border-color: #2196F3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.size-btn {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.size-btn:hover {
+    background-color: #f5f5f5;
+    border-color: #2196F3;
+    color: #2196F3;
+}
+
+.size-btn:active {
+    background-color: #2196F3;
+    color: white;
+}
+
+/* Color Controls */
+.color-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.color-btn {
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease;
+    min-width: 100px;
+}
+
+.color-btn:hover {
+    border-color: #2196F3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.color-btn-text {
+    display: block;
+}
+
+/* Decoration Controls */
+.decoration-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.decoration-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.decoration-btn:hover {
+    border-color: #2196F3;
+    color: #2196F3;
+    transform: translateY(-1px);
+}
+
+.decoration-btn.active {
+    background-color: #2196F3;
+    border-color: #2196F3;
+    color: white;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
+.decoration-btn.active:hover {
+    background-color: #1976D2;
+    border-color: #1976D2;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .font-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .font-family-select {
+        margin-bottom: 10px;
+    }
+    
+    .decoration-controls {
+        justify-content: center;
+    }
+    
+    .text-styling-panel {
+        padding: 15px;
+        margin: 10px;
+    }
+}

@@ -1,5 +1,5 @@
 /**
- * Constants for Speech Bubble Editor
+ * Constants for Speech Bubble Editor (Updated with Text Constants)
  */
 class Constants {
     // Bubble dimensions
@@ -69,6 +69,47 @@ class Constants {
             </g>
         </g>
     </svg>`;
+    
+    // ===== TEXT SYSTEM CONSTANTS (NEW) =====
+    
+    // Default text properties
+    static DEFAULT_FONT_SIZE = 18;
+    static DEFAULT_FONT_FAMILY = 'Arial';
+    static DEFAULT_FONT_WEIGHT = 400;
+    static DEFAULT_TEXT_COLOR = '#000000';
+    
+    // Font system
+    static SYSTEM_FONTS = new Set([
+        'Arial', 'Helvetica', 'Times New Roman', 'Times', 'Courier New', 'Courier',
+        'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS',
+        'Trebuchet MS', 'Arial Black', 'Impact', 'Lucida Console', 'Tahoma',
+        'Geneva', 'Lucida Sans', 'Lucida Grande', 'Optima', 'Futura'
+    ]);
+    
+    static FONT_CATEGORIES = {
+        'Arial': 'sans-serif',
+        'Helvetica': 'sans-serif',
+        'Times New Roman': 'serif',
+        'Times': 'serif',
+        'Courier New': 'monospace',
+        'Courier': 'monospace',
+        'Verdana': 'sans-serif',
+        'Georgia': 'serif',
+        'Palatino': 'serif',
+        'Garamond': 'serif',
+        'Bookman': 'serif',
+        'Comic Sans MS': 'cursive',
+        'Trebuchet MS': 'sans-serif',
+        'Arial Black': 'sans-serif',
+        'Impact': 'sans-serif',
+        'Lucida Console': 'monospace',
+        'Tahoma': 'sans-serif',
+        'Geneva': 'sans-serif',
+        'Lucida Sans': 'sans-serif',
+        'Lucida Grande': 'sans-serif',
+        'Optima': 'sans-serif',
+        'Futura': 'sans-serif'
+    };
     
     // Other constants
     static FLOAT_TOLERANCE = 0.01;
