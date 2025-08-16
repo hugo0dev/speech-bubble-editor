@@ -1,5 +1,5 @@
 /**
- * TextElementManager - Fixed with simplified interaction (REMOVED duplicate drag logic)
+ * TextElementManager - Cleaned with conflicting drag logic removed (FIXED: Default selection)
  */
 class TextElementManager {
     constructor(canvasContainer, fontLoader) {
@@ -78,6 +78,18 @@ class TextElementManager {
     }
     
     createTextElement(x = null, y = null, content = '') {
+        /*
+        LOGIC PLAN:
+        1. Generate unique ID for text element
+        2. Calculate default position if not provided
+        3. Create DOM element with proper styling
+        4. Create internal data structure
+        5. Add to DOM and register with SelectionManager
+        6. Add interaction listeners (simplified - no drag logic)
+        7. AUTOMATICALLY SELECT the new text element
+        8. Start editing immediately
+        */
+        
         const id = ++this.elementIdCounter;
         
         // Default position to center of viewport if not specified
@@ -138,8 +150,16 @@ class TextElementManager {
             window.selectionManager.registerElement(element, 'text', textData);
         }
         
-        // SIMPLIFIED: Add only essential interaction listeners (NO DRAG LOGIC)
-        this.addTextInteractionListeners(element);
+        // CLEANED: Add only essential interaction listeners (NO DRAG LOGIC)
+        this.addSimplifiedInteractionListeners(element);
+        
+        // FIXED: Automatically select the new text element for highlighting
+        if (window.selectionManager) {
+            // Clear any existing selection first
+            window.selectionManager.clearSelection();
+            // Select the new text element
+            window.selectionManager.addToSelection(element, 'text', textData);
+        }
         
         // Start editing immediately for new text
         setTimeout(() => this.startEditing(element), 100);
@@ -147,35 +167,27 @@ class TextElementManager {
         return element;
     }
 
-    // FIXED: Simplified interaction - removed all drag logic, drag now handled by InteractionManager
-    addTextInteractionListeners(textElement) {
+    // CLEANED: Simplified interaction - ALL drag logic removed (handled by InteractionManager)
+    addSimplifiedInteractionListeners(textElement) {
         /*
         LOGIC PLAN:
-        1. Add click handler for selection (not drag)
-        2. Add double-click handler for editing
-        3. Remove all drag logic - InteractionManager handles this now
-        4. Keep editing protection
+        1. Add double-click handler for editing (essential functionality)
+        2. Remove ALL drag logic - InteractionManager handles this now
+        3. Remove click selection logic - SelectionManager handles this via registration
+        4. Keep only editing protection
         */
         
-        // Click for selection only (drag handled by InteractionManager)
-        textElement.addEventListener('click', (e) => {
-            // Don't interfere if editing
-            if (textElement.classList.contains('editing')) {
-                return;
-            }
-            
-            e.stopPropagation();
-            // Selection is handled by InteractionManager now
-        });
-        
-        // Double-click for editing
+        // Double-click for editing (essential functionality)
         textElement.addEventListener('dblclick', (e) => {
             e.stopPropagation();
             this.startEditing(textElement);
         });
+        
+        // NOTE: All drag logic has been REMOVED - InteractionManager handles this
+        // NOTE: Click selection handled by SelectionManager via element registration
     }
     
-    // Method used by InteractionManager for group movement (KEEP THIS)
+    // ESSENTIAL: Used by InteractionManager for unified drag operations (KEEP THIS)
     updateTextElementPosition(element, newX, newY) {
         /*
         LOGIC PLAN:
@@ -242,6 +254,16 @@ class TextElementManager {
     }
     
     finishEditing() {
+        /*
+        LOGIC PLAN:
+        1. Check if there's a current editing element
+        2. Get new content from input field
+        3. If content is valid, update element and data
+        4. If content is empty, delete the element
+        5. Re-enable dragging and clean up editing state
+        6. FIXED: Ensure element remains selected after editing
+        */
+        
         if (!this.currentEditingElement) return;
         
         const newContent = this.editorInput.value.trim();
@@ -251,14 +273,25 @@ class TextElementManager {
                 textData.content = newContent;
                 this.currentEditingElement.textContent = newContent;
             }
+            
+            // FIXED: Ensure element remains selected after editing
+            if (window.selectionManager) {
+                const textData = this.getTextDataByElement(this.currentEditingElement);
+                if (textData) {
+                    window.selectionManager.addToSelection(this.currentEditingElement, 'text', textData);
+                }
+            }
         } else {
             // If empty, delete the text element
             this.deleteTextElement(this.currentEditingElement);
         }
         
         // Re-enable dragging
-        this.currentEditingElement.style.pointerEvents = 'all';
-        this.currentEditingElement.classList.remove('editing');
+        if (this.currentEditingElement) {
+            this.currentEditingElement.style.pointerEvents = 'all';
+            this.currentEditingElement.classList.remove('editing');
+        }
+        
         this.currentEditingElement = null;
         this.editorModal.style.display = 'none';
         this.editorInput.value = '';
@@ -438,7 +471,7 @@ class TextElementManager {
         this.canvasContainer.appendChild(newElement);
         
         // Add interaction listeners
-        this.addTextInteractionListeners(newElement);
+        this.addSimplifiedInteractionListeners(newElement);
         
         // Register with SelectionManager
         if (window.selectionManager) {

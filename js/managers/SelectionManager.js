@@ -1,5 +1,5 @@
 /**
- * SelectionManager - Unified selection system (FIXED: Prevents drag interference)
+ * SelectionManager - Unified selection system (FIXED: Text highlighting with border outline)
  */
 class SelectionManager {
     constructor() {
@@ -496,11 +496,21 @@ class SelectionManager {
     }
     
     /**
-     * Apply visual highlighting to selected element
+     * Apply visual highlighting to selected element (FIXED: Border-based text highlighting)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
     highlightElement(element, type) {
+        /*
+        LOGIC PLAN:
+        1. Add generic 'selected' class to element
+        2. Determine selection state (individual, multi-selection, grouped)
+        3. Apply appropriate highlighting based on type and state
+        4. For text individual selection: use dashed border outline (NOT background)
+        5. For text multi/grouped selection: use boxShadow system
+        6. For bubbles: maintain existing behavior with bubble manager integration
+        */
+        
         element.classList.add('selected');
         
         // Check multi-selection state based on CURRENT selection size
@@ -538,31 +548,41 @@ class SelectionManager {
                 }
             }
         } else if (type === 'text') {
-            // Enhanced text element highlighting
+            // FIXED: Border-based text element highlighting (bigger, green, solid)
             if (!isGrouped && !isMultiSelection) {
-                // Single text selection
-                element.style.background = 'rgba(33, 150, 243, 0.1)';
+                // Single text selection: use solid green border outline
+                element.style.border = '3px solid #4CAF50';
                 element.style.borderRadius = '4px';
                 element.style.transition = 'all 0.2s ease';
+                // Removed: element.style.background - no background color
             }
             // Multi-selection and grouped styling handled by boxShadow above
         }
     }
     
     /**
-     * Remove visual highlighting from element
+     * Remove visual highlighting from element (FIXED: Updated border cleanup)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
     unhighlightElement(element, type) {
+        /*
+        LOGIC PLAN:
+        1. Remove generic 'selected' class
+        2. Clean up all possible visual indicators including new border styling
+        3. Handle type-specific cleanup (bubble manager deselection)
+        4. Clean up group selection indicators if no group members remain selected
+        */
+        
         element.classList.remove('selected');
         
-        // Clean up all visual indicators
+        // Clean up all visual indicators (FIXED: Added border cleanup)
         element.style.boxShadow = '';
         element.style.borderRadius = '';
         element.style.transition = '';
         element.style.background = '';
         element.style.borderColor = '';
+        element.style.border = ''; // FIXED: Added border cleanup for text elements
         
         // Type-specific cleanup
         if (type === 'bubble') {
