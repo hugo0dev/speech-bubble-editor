@@ -1,5 +1,5 @@
 /**
- * InteractionManager - Handles user interactions (Updated with Group Transformation - Phase 1)
+ * InteractionManager - Handles user interactions (FIXED: Group Boundary Collision Detection)
  */
 class InteractionManager {
     constructor(canvasContainer, bubbleManager, handleManager, controlPointManager) {
@@ -8,29 +8,28 @@ class InteractionManager {
         this.handleManager = handleManager;
         this.controlPointManager = controlPointManager;
         
-        // Existing drag state
+        // Unified drag state (works for both bubbles and text)
         this.isDragging = false;
-        this.draggedBubble = null;
+        this.draggedElement = null; // Can be bubble or text element
         this.dragOffset = { x: 0, y: 0 };
         
-        // Existing group drag state (from Phase 3)
+        // Group drag state
         this.isGroupDrag = false;
         this.groupMembers = [];
         this.relativeOffsets = new Map();
-        this.draggedElement = null;
         
-        // Existing resize state
+        // Resize state
         this.isResizing = false;
         this.resizeHandle = null;
         this.resizeBubble = null;
         this.resizeStartData = null;
         
-        // Existing rotation state
+        // Rotation state
         this.isRotating = false;
         this.rotationBubble = null;
         this.rotationStartData = null;
         
-        // NEW: Group transformation states (Phase 4 - Increment 1)
+        // Group transformation states
         this.isGroupResize = false;
         this.isGroupRotation = false;
         this.groupResizeMembers = [];
@@ -46,6 +45,10 @@ class InteractionManager {
         this.controlPointDirection = null;
         this.controlPointStartData = null;
         
+        // Selection preservation state for control point operations
+        this.storedSelectionState = null;
+        this.isSelectionPreservationActive = false;
+        
         // Deformation optimization
         this.deformationThrottle = null;
         this.lastDeformationUpdate = 0;
@@ -54,79 +57,147 @@ class InteractionManager {
         this.initEventListeners();
     }
     
-    // ===== NEW: GROUP TRANSFORMATION DETECTION FUNCTIONS (Phase 4 - Increment 1) =====
+    // ===== SELECTION PRESERVATION METHODS (NEW) =====
     
     /**
-     * Detect if resize operation should be handled as group transformation
-     * @param {HTMLElement} element - Element being resized
-     * @returns {boolean} - True if group resize should be handled
+     * Store current selection state before control point operations
      */
+    storeSelectionStateForControlPoint() {
+        const selectionManager = window.selectionManager || window.editor?.selectionManager;
+        if (!selectionManager || !selectionManager.hasSelection()) {
+            this.storedSelectionState = null;
+            this.isSelectionPreservationActive = false;
+            return;
+        }
+        
+        try {
+            // Capture current selection state
+            const selectedElements = selectionManager.getSelectedElements();
+            this.storedSelectionState = [];
+            
+            selectedElements.forEach((selectionItem, element) => {
+                // Store essential data for restoration
+                this.storedSelectionState.push({
+                    element: element,
+                    type: selectionItem.type,
+                    data: selectionItem.data
+                });
+            });
+            
+            this.isSelectionPreservationActive = true;
+            console.log('Stored selection state for control point operation:', this.storedSelectionState.length, 'elements');
+            
+        } catch (error) {
+            console.warn('Failed to store selection state for control point operation:', error);
+            this.clearStoredSelectionState();
+        }
+    }
+    
+    /**
+     * Restore selection state after control point operations
+     */
+    restoreSelectionStateAfterControlPoint() {
+        if (!this.isSelectionPreservationActive || !this.storedSelectionState) {
+            return;
+        }
+        
+        const selectionManager = window.selectionManager || window.editor?.selectionManager;
+        if (!selectionManager) {
+            console.warn('SelectionManager not available for selection restoration');
+            this.clearStoredSelectionState();
+            return;
+        }
+        
+        try {
+            console.log('Restoring selection state after control point operation');
+            
+            // Clear current selection first to avoid conflicts
+            selectionManager.clearSelection();
+            
+            // Restore each element that was previously selected
+            let restoredCount = 0;
+            this.storedSelectionState.forEach(selectionItem => {
+                try {
+                    // Verify element still exists and is valid
+                    if (selectionItem.element && 
+                        document.contains(selectionItem.element) && 
+                        selectionManager.elementRegistry.has(selectionItem.element)) {
+                        
+                        selectionManager.addToSelection(
+                            selectionItem.element, 
+                            selectionItem.type, 
+                            selectionItem.data
+                        );
+                        restoredCount++;
+                    }
+                } catch (elementError) {
+                    console.warn('Failed to restore selection for individual element:', elementError);
+                }
+            });
+            
+            console.log('Successfully restored selection for', restoredCount, 'of', this.storedSelectionState.length, 'elements');
+            
+        } catch (error) {
+            console.warn('Failed to restore selection state after control point operation:', error);
+        } finally {
+            this.clearStoredSelectionState();
+        }
+    }
+    
+    /**
+     * Clear stored selection state (cleanup method)
+     */
+    clearStoredSelectionState() {
+        this.storedSelectionState = null;
+        this.isSelectionPreservationActive = false;
+    }
+    
+    // ===== GROUP TRANSFORMATION DETECTION FUNCTIONS =====
+    
     detectGroupResizeStart(element) {
-        // Get SelectionManager from global reference
         const selectionManager = window.selectionManager || window.editor?.selectionManager;
         if (!selectionManager) {
             return false;
         }
         
-        // Check if element is part of a group
         const groupId = selectionManager.getElementGroup(element);
         if (!groupId) {
             return false;
         }
         
-        // Get all group members
         const groupMembers = selectionManager.getGroupMembers(groupId);
         if (groupMembers.length < 2) {
-            return false; // Not really a group anymore
+            return false;
         }
         
         console.log(`Group resize detected: ${groupMembers.length} members`);
-        
-        // Initialize group resize state
         this.initializeGroupResizeState(groupMembers, element);
-        
         return true;
     }
     
-    /**
-     * Detect if rotation operation should be handled as group transformation
-     * @param {HTMLElement} element - Element being rotated
-     * @returns {boolean} - True if group rotation should be handled
-     */
     detectGroupRotationStart(element) {
-        // Get SelectionManager from global reference
         const selectionManager = window.selectionManager || window.editor?.selectionManager;
         if (!selectionManager) {
             return false;
         }
         
-        // Check if element is part of a group
         const groupId = selectionManager.getElementGroup(element);
         if (!groupId) {
             return false;
         }
         
-        // Get all group members
         const groupMembers = selectionManager.getGroupMembers(groupId);
         if (groupMembers.length < 2) {
-            return false; // Not really a group anymore
+            return false;
         }
         
         console.log(`Group rotation detected: ${groupMembers.length} members`);
-        
-        // Initialize group rotation state
         this.initializeGroupRotationState(groupMembers, element);
-        
         return true;
     }
     
-    // ===== NEW: GROUP BOUNDS CALCULATION FUNCTIONS (Phase 4 - Increment 1) =====
+    // ===== GROUP BOUNDS CALCULATION FUNCTIONS =====
     
-    /**
-     * Calculate overall bounds of a group of elements
-     * @param {Array} groupMembers - Array of DOM elements in the group
-     * @returns {Object} - Bounds object with center point
-     */
     calculateGroupBounds(groupMembers) {
         if (!groupMembers || groupMembers.length === 0) {
             return null;
@@ -137,7 +208,6 @@ class InteractionManager {
         let maxX = -Infinity;
         let maxY = -Infinity;
         
-        // Iterate through all group members to find overall bounds
         groupMembers.forEach(element => {
             const bounds = this.getElementBounds(element);
             if (bounds) {
@@ -148,7 +218,6 @@ class InteractionManager {
             }
         });
         
-        // Calculate group bounds and center
         const groupBounds = {
             x: minX,
             y: minY,
@@ -162,11 +231,6 @@ class InteractionManager {
         return groupBounds;
     }
     
-    /**
-     * Get bounds for any element type (bubble or text)
-     * @param {HTMLElement} element - DOM element
-     * @returns {Object} - Bounds object {x, y, width, height}
-     */
     getElementBounds(element) {
         // Try to get bubble data first
         const bubbleData = this.bubbleManager?.getBubbleData(element);
@@ -202,26 +266,19 @@ class InteractionManager {
         return { x, y, width, height };
     }
     
-    // ===== NEW: STATE MANAGEMENT FUNCTIONS (Phase 4 - Increment 1) =====
+    // ===== STATE MANAGEMENT FUNCTIONS =====
     
-    /**
-     * Initialize state for group resize operation
-     * @param {Array} groupMembers - Elements in the group
-     * @param {HTMLElement} primaryElement - Element being directly manipulated
-     */
     initializeGroupResizeState(groupMembers, primaryElement) {
         this.isGroupResize = true;
         this.groupResizeMembers = [...groupMembers];
         this.primaryTransformElement = primaryElement;
         
-        // Calculate initial group bounds and center
         this.groupOriginalBounds = this.calculateGroupBounds(groupMembers);
         this.groupTransformCenter = {
             x: this.groupOriginalBounds.centerX,
             y: this.groupOriginalBounds.centerY
         };
         
-        // Store original bounds for each group member
         const memberBounds = new Map();
         groupMembers.forEach(member => {
             const bounds = this.getElementBounds(member);
@@ -229,7 +286,6 @@ class InteractionManager {
         });
         this.groupOriginalPositions = memberBounds;
         
-        // Apply visual feedback
         this.applyGroupTransformationVisualFeedback(groupMembers, true);
         
         console.log('Group resize state initialized:', {
@@ -239,24 +295,17 @@ class InteractionManager {
         });
     }
     
-    /**
-     * Initialize state for group rotation operation
-     * @param {Array} groupMembers - Elements in the group
-     * @param {HTMLElement} primaryElement - Element being directly manipulated
-     */
     initializeGroupRotationState(groupMembers, primaryElement) {
         this.isGroupRotation = true;
         this.groupRotationMembers = [...groupMembers];
         this.primaryTransformElement = primaryElement;
         
-        // Calculate initial group center
         const groupBounds = this.calculateGroupBounds(groupMembers);
         this.groupTransformCenter = {
             x: groupBounds.centerX,
             y: groupBounds.centerY
         };
         
-        // Store original positions relative to group center
         const memberPositions = new Map();
         groupMembers.forEach(member => {
             const bounds = this.getElementBounds(member);
@@ -269,7 +318,6 @@ class InteractionManager {
         });
         this.groupOriginalPositions = memberPositions;
         
-        // Apply visual feedback
         this.applyGroupTransformationVisualFeedback(groupMembers, true);
         
         console.log('Group rotation state initialized:', {
@@ -278,20 +326,15 @@ class InteractionManager {
         });
     }
     
-    /**
-     * Clean up group transformation state
-     */
     cleanupGroupTransformationState() {
         if (this.isGroupResize || this.isGroupRotation) {
             console.log('Cleaning up group transformation state');
             
-            // Remove visual feedback
             const allMembers = [...this.groupResizeMembers, ...this.groupRotationMembers];
             if (allMembers.length > 0) {
                 this.applyGroupTransformationVisualFeedback(allMembers, false);
             }
             
-            // Update handles for any bubbles in the group
             allMembers.forEach(member => {
                 const bubbleData = this.bubbleManager?.getBubbleData(member);
                 if (bubbleData && this.handleManager) {
@@ -300,7 +343,6 @@ class InteractionManager {
             });
         }
         
-        // Reset group transformation state
         this.isGroupResize = false;
         this.isGroupRotation = false;
         this.groupResizeMembers = [];
@@ -311,22 +353,13 @@ class InteractionManager {
         this.primaryTransformElement = null;
     }
     
-    // ===== NEW: VISUAL FEEDBACK FUNCTIONS (Phase 4 - Increment 1) =====
-    
-    /**
-     * Apply visual feedback during group transformations
-     * @param {Array} groupMembers - Elements in the group
-     * @param {boolean} isActive - Whether to show or hide feedback
-     */
     applyGroupTransformationVisualFeedback(groupMembers, isActive) {
         groupMembers.forEach(member => {
             if (isActive) {
-                // Apply transformation visual feedback (different from group movement)
                 member.style.boxShadow = '0 0 0 2px #FF9800, 0 0 12px rgba(255, 152, 0, 0.6)';
                 member.style.transition = 'box-shadow 0.2s ease';
                 member.style.opacity = '0.9';
             } else {
-                // Remove transformation visual feedback
                 member.style.boxShadow = '';
                 member.style.transition = '';
                 member.style.opacity = '1';
@@ -340,36 +373,29 @@ class InteractionManager {
         }
     }
     
-    // ===== EXISTING GROUP DRAG FUNCTIONALITY (Phase 3 - preserved) =====
+    // ===== GROUP DRAG FUNCTIONALITY =====
     
     detectGroupDragStart(element) {
-        // Get SelectionManager from global reference
         const selectionManager = window.selectionManager || window.editor?.selectionManager;
         if (!selectionManager) {
             return false;
         }
         
-        // Check if element is part of a group
         const groupId = selectionManager.getElementGroup(element);
         if (!groupId) {
             return false;
         }
         
-        // Get all group members
         const groupMembers = selectionManager.getGroupMembers(groupId);
         if (groupMembers.length < 2) {
-            return false; // Not really a group anymore
+            return false;
         }
         
-        // Store group drag state
         this.isGroupDrag = true;
         this.groupMembers = groupMembers;
         this.draggedElement = element;
         
-        // Calculate relative positions
         this.relativeOffsets = this.calculateGroupRelativePositions(element, groupMembers);
-        
-        // Apply visual feedback
         this.applyGroupDragVisualFeedback(groupMembers, true);
         
         console.log(`Group drag detected: ${groupMembers.length} members`);
@@ -379,16 +405,14 @@ class InteractionManager {
     calculateGroupRelativePositions(draggedElement, groupMembers) {
         const relativeOffsets = new Map();
         
-        // Get dragged element position
         const draggedPos = this.getElementPosition(draggedElement);
         if (!draggedPos) {
             return relativeOffsets;
         }
         
-        // Calculate relative offsets for each group member
         groupMembers.forEach(member => {
             if (member === draggedElement) {
-                return; // Skip the dragged element itself
+                return;
             }
             
             const memberPos = this.getElementPosition(member);
@@ -420,198 +444,92 @@ class InteractionManager {
             }
         }
         
-        // Fallback to element style (less reliable)
+        // Fallback to element style
         const x = parseFloat(element.style.left) || 0;
         const y = parseFloat(element.style.top) || 0;
         return { x, y };
     }
     
     updateGroupPositions(newDraggedX, newDraggedY) {
+        /*
+        LOGIC PLAN:
+        1. Check if we're in group drag mode
+        2. Calculate the current group's collective bounding box
+        3. Calculate proposed new group bounding box based on drag movement
+        4. Check if proposed bounding box exceeds canvas boundaries  
+        5. If so, constrain the movement to keep entire group within bounds
+        6. Apply the constrained movement to all group members
+        */
+        
         if (!this.isGroupDrag || !this.draggedElement) {
             return;
         }
         
-        // STEP 2: Apply group-aware boundary constraints
-        const constrainedPos = this.calculateGroupBoundaryConstraints(
-            this.draggedElement, newDraggedX, newDraggedY
-        );
+        // Get current position of dragged element
+        const currentDraggedPos = this.getElementPosition(this.draggedElement);
+        if (!currentDraggedPos) {
+            return;
+        }
         
-        // Update dragged element to constrained position that maintains group integrity
-        this.updateElementPosition(this.draggedElement, constrainedPos.constrainedX, constrainedPos.constrainedY);
+        // Calculate movement delta
+        const deltaX = newDraggedX - currentDraggedPos.x;
+        const deltaY = newDraggedY - currentDraggedPos.y;
         
-        // Update other group members using exact relative offsets from constrained position
-        // No individual constraints needed since group constraint already applied
+        // Calculate current group bounding box
+        const currentGroupBounds = this.calculateGroupBounds(this.groupMembers);
+        if (!currentGroupBounds) {
+            return;
+        }
+        
+        // Calculate proposed new group bounding box
+        const proposedGroupBounds = {
+            x: currentGroupBounds.x + deltaX,
+            y: currentGroupBounds.y + deltaY,
+            width: currentGroupBounds.width,
+            height: currentGroupBounds.height
+        };
+        
+        // Check canvas boundaries and constrain if needed
+        const canvasWidth = this.canvasContainer.offsetWidth;
+        const canvasHeight = this.canvasContainer.offsetHeight;
+        
+        let constrainedDeltaX = deltaX;
+        let constrainedDeltaY = deltaY;
+        
+        // Left boundary check
+        if (proposedGroupBounds.x < 0) {
+            constrainedDeltaX = deltaX - proposedGroupBounds.x; // Adjust to keep left edge at 0
+        }
+        
+        // Right boundary check  
+        if (proposedGroupBounds.x + proposedGroupBounds.width > canvasWidth) {
+            const excess = (proposedGroupBounds.x + proposedGroupBounds.width) - canvasWidth;
+            constrainedDeltaX = deltaX - excess; // Adjust to keep right edge within canvas
+        }
+        
+        // Top boundary check
+        if (proposedGroupBounds.y < 0) {
+            constrainedDeltaY = deltaY - proposedGroupBounds.y; // Adjust to keep top edge at 0
+        }
+        
+        // Bottom boundary check
+        if (proposedGroupBounds.y + proposedGroupBounds.height > canvasHeight) {
+            const excess = (proposedGroupBounds.y + proposedGroupBounds.height) - canvasHeight;
+            constrainedDeltaY = deltaY - excess; // Adjust to keep bottom edge within canvas
+        }
+        
+        // Apply constrained movement to dragged element
+        const constrainedDraggedX = currentDraggedPos.x + constrainedDeltaX;
+        const constrainedDraggedY = currentDraggedPos.y + constrainedDeltaY;
+        
+        this.updateElementPosition(this.draggedElement, constrainedDraggedX, constrainedDraggedY);
+        
+        // Apply constrained movement to all other group members
         this.relativeOffsets.forEach((offset, member) => {
-            const newX = constrainedPos.constrainedX + offset.x;
-            const newY = constrainedPos.constrainedY + offset.y;
-            
-            // Direct position update without individual constraints
+            const newX = constrainedDraggedX + offset.x;
+            const newY = constrainedDraggedY + offset.y;
             this.updateElementPosition(member, newX, newY);
         });
-    }
-
-    /**
-     * STEP 1: Calculate group-aware boundary constraints
-     * Ensures entire group stays within canvas when dragged element moves to new position
-     * @param {HTMLElement} draggedElement - The element being actively dragged
-     * @param {number} newDraggedX - Proposed new X position for dragged element
-     * @param {number} newDraggedY - Proposed new Y position for dragged element
-     * @returns {Object} - {constrainedX, constrainedY} safe position for dragged element
-     */
-    calculateGroupBoundaryConstraints(draggedElement, newDraggedX, newDraggedY) {
-        // Get current position of dragged element for calculating movement delta
-        const currentDraggedPos = this.getElementPosition(draggedElement);
-        if (!currentDraggedPos) {
-            return { constrainedX: newDraggedX, constrainedY: newDraggedY };
-        }
-        
-        // Calculate proposed movement delta
-        const proposedDeltaX = newDraggedX - currentDraggedPos.x;
-        const proposedDeltaY = newDraggedY - currentDraggedPos.y;
-        
-        // Calculate proposed positions for all group members
-        const groupMemberPositions = [];
-        
-        // Add dragged element position
-        groupMemberPositions.push({
-            element: draggedElement,
-            proposedX: newDraggedX,
-            proposedY: newDraggedY
-        });
-        
-        // Add other group member positions using relative offsets
-        this.relativeOffsets.forEach((offset, member) => {
-            groupMemberPositions.push({
-                element: member,
-                proposedX: newDraggedX + offset.x,
-                proposedY: newDraggedY + offset.y
-            });
-        });
-        
-        // STEP 4: Find movement limits that keep entire group within bounds
-        const movementLimits = this.findGroupMovementLimits(groupMemberPositions);
-        
-        // STEP 5: Apply group constraints to dragged element movement
-        return this.applyGroupConstraints(
-            currentDraggedPos.x, currentDraggedPos.y,
-            newDraggedX, newDraggedY,
-            movementLimits.maxDeltaX, movementLimits.maxDeltaY
-        );
-    }
-    
-    /**
-     * STEP 3: Calculate boundary limits for individual element
-     * @param {HTMLElement} element - Element to check
-     * @param {number} proposedX - Proposed X position
-     * @param {number} proposedY - Proposed Y position
-     * @returns {Object} - Boundary violation amounts
-     */
-    calculateElementBoundaryLimits(element, proposedX, proposedY) {
-        const elementWidth = element.offsetWidth || 50;
-        const elementHeight = element.offsetHeight || 50;
-        const canvasWidth = this.canvasContainer.offsetWidth;
-        const canvasHeight = this.canvasContainer.offsetHeight;
-        
-        // Calculate how much element would exceed boundaries
-        const excessLeft = Math.max(0, -proposedX);
-        const excessRight = Math.max(0, (proposedX + elementWidth) - canvasWidth);
-        const excessTop = Math.max(0, -proposedY);
-        const excessBottom = Math.max(0, (proposedY + elementHeight) - canvasHeight);
-        
-        return {
-            excessLeft,
-            excessRight, 
-            excessTop,
-            excessBottom
-        };
-    }
-    
-    /**
-     * STEP 4: Find maximum safe movement for entire group
-     * @param {Array} groupMemberPositions - Array of {element, proposedX, proposedY}
-     * @returns {Object} - {maxDeltaX, maxDeltaY} maximum safe movement
-     */
-    findGroupMovementLimits(groupMemberPositions) {
-        let maxAllowedLeft = Infinity;
-        let maxAllowedRight = Infinity;
-        let maxAllowedUp = Infinity;
-        let maxAllowedDown = Infinity;
-        
-        // Check boundary violations for each group member
-        groupMemberPositions.forEach(memberPos => {
-            const limits = this.calculateElementBoundaryLimits(
-                memberPos.element, 
-                memberPos.proposedX, 
-                memberPos.proposedY
-            );
-            
-            // Track the most restrictive constraints across all members
-            maxAllowedLeft = Math.min(maxAllowedLeft, limits.excessLeft);
-            maxAllowedRight = Math.min(maxAllowedRight, limits.excessRight);
-            maxAllowedUp = Math.min(maxAllowedUp, limits.excessTop);
-            maxAllowedDown = Math.min(maxAllowedDown, limits.excessBottom);
-        });
-        
-        // Convert boundary violations to movement limits
-        // If any element would exceed boundary, reduce allowed movement accordingly
-        const canvasWidth = this.canvasContainer.offsetWidth;
-        const canvasHeight = this.canvasContainer.offsetHeight;
-        
-        const maxDeltaX = Math.min(
-            canvasWidth,  // Fallback maximum
-            maxAllowedLeft === 0 ? Infinity : maxAllowedLeft,
-            maxAllowedRight === 0 ? Infinity : maxAllowedRight
-        );
-        
-        const maxDeltaY = Math.min(
-            canvasHeight, // Fallback maximum  
-            maxAllowedUp === 0 ? Infinity : maxAllowedUp,
-            maxAllowedDown === 0 ? Infinity : maxAllowedDown
-        );
-        
-        return {
-            maxDeltaX: maxDeltaX === Infinity ? canvasWidth : maxDeltaX,
-            maxDeltaY: maxDeltaY === Infinity ? canvasHeight : maxDeltaY
-        };
-    }
-    
-    /**
-     * STEP 5: Apply calculated constraints to dragged element movement
-     * @param {number} originalX - Original X position of dragged element
-     * @param {number} originalY - Original Y position of dragged element  
-     * @param {number} proposedX - Proposed new X position
-     * @param {number} proposedY - Proposed new Y position
-     * @param {number} maxDeltaX - Maximum allowed X movement
-     * @param {number} maxDeltaY - Maximum allowed Y movement
-     * @returns {Object} - {constrainedX, constrainedY} final safe position
-     */
-    applyGroupConstraints(originalX, originalY, proposedX, proposedY, maxDeltaX, maxDeltaY) {
-        // Calculate intended movement
-        const intendedDeltaX = proposedX - originalX;
-        const intendedDeltaY = proposedY - originalY;
-        
-        // Apply movement constraints
-        const constrainedDeltaX = this.clampMovement(intendedDeltaX, maxDeltaX);
-        const constrainedDeltaY = this.clampMovement(intendedDeltaY, maxDeltaY);
-        
-        // Calculate final constrained position
-        return {
-            constrainedX: originalX + constrainedDeltaX,
-            constrainedY: originalY + constrainedDeltaY
-        };
-    }
-    
-    /**
-     * Helper: Clamp movement delta to allowed range
-     * @param {number} intendedDelta - Intended movement amount
-     * @param {number} maxDelta - Maximum allowed movement
-     * @returns {number} - Clamped movement amount
-     */
-    clampMovement(intendedDelta, maxDelta) {
-        if (maxDelta === Infinity) {
-            return intendedDelta;
-        }
-        return Math.max(-maxDelta, Math.min(maxDelta, intendedDelta));
     }
     
     updateElementPosition(element, newX, newY) {
@@ -623,8 +541,7 @@ class InteractionManager {
             element.style.left = newX + 'px';
             element.style.top = newY + 'px';
             
-            // Update handles if this is the main dragged element
-            if (element === this.draggedBubble || element === this.draggedElement) {
+            if (element === this.draggedElement) {
                 this.handleManager?.updateHandlePositions(element);
             }
             return;
@@ -680,10 +597,8 @@ class InteractionManager {
             return;
         }
         
-        // Remove visual feedback
         this.applyGroupDragVisualFeedback(this.groupMembers, false);
         
-        // Update handles for any bubbles in the group
         this.groupMembers.forEach(member => {
             const bubbleData = this.bubbleManager?.getBubbleData(member);
             if (bubbleData && this.handleManager) {
@@ -691,7 +606,6 @@ class InteractionManager {
             }
         });
         
-        // Reset group drag state
         this.isGroupDrag = false;
         this.groupMembers = [];
         this.relativeOffsets.clear();
@@ -707,7 +621,6 @@ class InteractionManager {
         document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         
         this.canvasContainer.addEventListener('click', (e) => {
-            // Fix: Check for ID 'background-image' not class, and also check if clicking on container itself
             if (e.target === this.canvasContainer || e.target.id === 'background-image') {
                 this.bubbleManager.deselectBubble();
             }
@@ -715,9 +628,12 @@ class InteractionManager {
         
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
         
+        // FIXED: Unified element handling for both bubbles and text
         this.canvasContainer.addEventListener('mousedown', (e) => {
             if (e.target.closest('.speech-bubble')) {
                 this.handleBubbleMouseDown(e, e.target.closest('.speech-bubble'));
+            } else if (e.target.closest('.text-element')) {
+                this.handleTextMouseDown(e, e.target.closest('.text-element'));
             }
         });
         
@@ -765,41 +681,90 @@ class InteractionManager {
         const isGroupDrag = this.detectGroupDragStart(bubbleElement);
         
         this.isDragging = true;
-        this.draggedBubble = bubbleElement;
+        this.draggedElement = bubbleElement; // Store as generic element
         
-        // Get the bubble data to use stored position instead of visual position
         const bubbleData = this.bubbleManager.getBubbleData(bubbleElement);
         const containerRect = this.canvasContainer.getBoundingClientRect();
         
         if (bubbleData) {
-            // Calculate offset from the stored position, not the transformed visual position
-            // This prevents jumping when dragging deformed bubbles
             const bubbleLeft = bubbleData.x + containerRect.left;
             const bubbleTop = bubbleData.y + containerRect.top;
             
             this.dragOffset.x = event.clientX - bubbleLeft;
             this.dragOffset.y = event.clientY - bubbleTop;
         } else {
-            // Fallback to old method if no bubble data
             const bubbleRect = bubbleElement.getBoundingClientRect();
             this.dragOffset.x = event.clientX - bubbleRect.left;
             this.dragOffset.y = event.clientY - bubbleRect.top;
         }
         
-        // Apply visual feedback (already handled in group detection if it's a group)
+        // Apply visual feedback
         if (!isGroupDrag) {
             bubbleElement.style.opacity = '0.8';
             bubbleElement.style.zIndex = '100';
         }
     }
     
-    // ===== MODIFIED: RESIZE HANDLING WITH GROUP DETECTION (Phase 4 - Increment 1) =====
+    // ===== NEW: TEXT ELEMENT HANDLING =====
+    
+    handleTextMouseDown(event, textElement) {
+        // Don't interfere if editing
+        if (textElement.classList.contains('editing')) {
+            return;
+        }
+        
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Set dragging state flag for SelectionManager
+        textElement.setAttribute('data-dragging', 'true');
+        
+        // Handle selection first (this triggers SelectionManager)
+        this.handleTextSelection(textElement, event);
+        
+        // Check for group drag
+        const isGroupDrag = this.detectGroupDragStart(textElement);
+        
+        this.isDragging = true;
+        this.draggedElement = textElement;
+        
+        // Calculate drag offset using element bounds
+        const elementRect = textElement.getBoundingClientRect();
+        const containerRect = this.canvasContainer.getBoundingClientRect();
+        
+        this.dragOffset.x = event.clientX - elementRect.left;
+        this.dragOffset.y = event.clientY - elementRect.top;
+        
+        // Apply visual feedback
+        if (!isGroupDrag) {
+            textElement.style.opacity = '0.8';
+            textElement.style.zIndex = '100';
+        }
+    }
+    
+    handleTextSelection(textElement, event) {
+        if (!window.selectionManager) return;
+        
+        const textElementManager = window.editor?.textElementManager;
+        if (!textElementManager) return;
+        
+        const textData = textElementManager.getTextDataByElement(textElement);
+        if (!textData) return;
+        
+        if (event.ctrlKey) {
+            window.selectionManager.toggleSelection(textElement, 'text', textData);
+        } else {
+            window.selectionManager.clearSelection();
+            window.selectionManager.addToSelection(textElement, 'text', textData);
+        }
+    }
+    
+    // ===== RESIZE HANDLING =====
     
     handleResizeMouseDown(event, handlePosition, bubbleElement) {
         event.preventDefault();
         event.stopPropagation();
         
-        // NEW: Check for group resize first
         const isGroupResize = this.detectGroupResizeStart(bubbleElement);
         
         this.isResizing = true;
@@ -817,19 +782,17 @@ class InteractionManager {
             aspectRatio: bubbleData.width / bubbleData.height
         };
         
-        // Apply visual feedback (group feedback already applied if group resize)
         if (!isGroupResize) {
             bubbleElement.style.opacity = '0.8';
         }
     }
     
-    // ===== MODIFIED: ROTATION HANDLING WITH GROUP DETECTION (Phase 4 - Increment 1) =====
+    // ===== ROTATION HANDLING =====
     
     handleRotationMouseDown(event, bubbleElement) {
         event.preventDefault();
         event.stopPropagation();
         
-        // NEW: Check for group rotation first
         const isGroupRotation = this.detectGroupRotationStart(bubbleElement);
         
         this.isRotating = true;
@@ -851,17 +814,19 @@ class InteractionManager {
             startRotation: bubbleData.rotation
         };
         
-        // Apply visual feedback (group feedback already applied if group rotation)
         if (!isGroupRotation) {
             bubbleElement.style.opacity = '0.8';
         }
     }
     
-    // ===== EXISTING CONTROL POINT HANDLING (unchanged) =====
+    // ===== CONTROL POINT HANDLING (UPDATED WITH SELECTION PRESERVATION) =====
     
     handleControlPointMouseDown(event, direction, bubbleElement) {
         event.preventDefault();
         event.stopPropagation();
+        
+        // FIXED: Store selection state before control point operation
+        this.storeSelectionStateForControlPoint();
         
         this.isControlPointDragging = true;
         this.controlPointBubble = bubbleElement;
@@ -924,7 +889,6 @@ class InteractionManager {
             bubbleData.controlPoints[this.controlPointDirection] = validatedPosition;
             bubbleData.isDeformed = this.controlPointManager.checkIfBubbleIsDeformed(bubbleData);
             
-            // Apply deformation which will now preserve rotation
             this.applyRealTimeDeformation();
             
             this.handleManager.updateControlPointHandlePosition(
@@ -970,80 +934,71 @@ class InteractionManager {
         let newY = event.clientY - containerRect.top - this.dragOffset.y;
         
         // Apply boundary constraints for the dragged element
-        const bubbleWidth = this.draggedBubble.offsetWidth;
-        const bubbleHeight = this.draggedBubble.offsetHeight;
+        const elementWidth = this.draggedElement.offsetWidth;
+        const elementHeight = this.draggedElement.offsetHeight;
         
-        newX = Math.max(0, Math.min(newX, this.canvasContainer.offsetWidth - bubbleWidth));
-        newY = Math.max(0, Math.min(newY, this.canvasContainer.offsetHeight - bubbleHeight));
+        newX = Math.max(0, Math.min(newX, this.canvasContainer.offsetWidth - elementWidth));
+        newY = Math.max(0, Math.min(newY, this.canvasContainer.offsetHeight - elementHeight));
         
         // Handle group vs individual dragging
         if (this.isGroupDrag) {
-            // Update entire group
             this.updateGroupPositions(newX, newY);
         } else {
-            // Update individual element
-            this.draggedBubble.style.left = newX + 'px';
-            this.draggedBubble.style.top = newY + 'px';
+            // Update individual element (works for both bubbles and text)
+            this.draggedElement.style.left = newX + 'px';
+            this.draggedElement.style.top = newY + 'px';
             
-            this.handleManager.updateHandlePositions(this.draggedBubble);
-            
-            const bubbleData = this.bubbleManager.getBubbleData(this.draggedBubble);
+            // Update data and handles
+            const bubbleData = this.bubbleManager.getBubbleData(this.draggedElement);
             if (bubbleData) {
+                // It's a bubble
                 bubbleData.x = newX;
                 bubbleData.y = newY;
+                this.handleManager.updateHandlePositions(this.draggedElement);
+            } else {
+                // It's a text element
+                const textElementManager = window.editor?.textElementManager;
+                if (textElementManager) {
+                    textElementManager.updateTextElementPosition(this.draggedElement, newX, newY);
+                }
             }
         }
     }
     
-    // ===== GROUP RESIZE IMPLEMENTATION (Phase 4 - Increment 2) =====
+    // ===== GROUP RESIZE IMPLEMENTATION =====
     
     handleResizeMove(event) {
         event.preventDefault();
         
         if (this.isGroupResize) {
-            // Handle group resize operation
             this.handleGroupResizeMove(event);
         } else {
-            // Handle individual resize operation
             this.handleIndividualResizeMove(event);
         }
     }
     
-    /**
-     * Handle group resize movement
-     * @param {MouseEvent} event - Mouse move event
-     */
     handleGroupResizeMove(event) {
         if (!this.groupResizeMembers.length || !this.groupTransformCenter || !this.resizeStartData) {
             return;
         }
         
-        // Calculate scale factor based on primary element's resize
         const deltaX = event.clientX - this.resizeStartData.mouseX;
         const deltaY = event.clientY - this.resizeStartData.mouseY;
         
-        // Determine scale factor based on resize handle direction
         let scaleFactor = 1.0;
         const delta = this.resizeHandle.includes('e') ? deltaX : -deltaX;
         const newWidth = Math.max(Constants.MIN_BUBBLE_WIDTH, this.resizeStartData.width + delta);
         scaleFactor = newWidth / this.resizeStartData.width;
         
-        // Constrain scale factor to reasonable limits
         scaleFactor = Math.max(0.3, Math.min(3.0, scaleFactor));
         
-        // Apply group resize transformation
         this.updateGroupResize(scaleFactor, this.groupTransformCenter, this.groupOriginalPositions);
         
-        // Update handles for the primary element only
         if (this.primaryTransformElement && this.handleManager) {
             this.handleManager.updateHandlePositions(this.primaryTransformElement);
         }
     }
     
-    /**
-     * Handle individual resize movement (existing logic)
-     * @param {MouseEvent} event - Mouse move event
-     */
     handleIndividualResizeMove(event) {
         const deltaX = event.clientX - this.resizeStartData.mouseX;
         const deltaY = event.clientY - this.resizeStartData.mouseY;
@@ -1101,32 +1056,22 @@ class InteractionManager {
         }
     }
     
-    /**
-     * Update all group members during resize operation
-     * @param {number} scaleFactor - Scale factor for the resize
-     * @param {Object} groupCenter - Center point of the group {x, y}
-     * @param {Map} originalBounds - Original bounds of group members
-     */
     updateGroupResize(scaleFactor, groupCenter, originalBounds) {
         if (!originalBounds || !groupCenter) {
             return;
         }
         
-        // Calculate new bounds for all group members
         const newBounds = new Map();
         
         originalBounds.forEach((bounds, element) => {
-            // Calculate new position relative to group center
             const relativeCenterX = bounds.x + bounds.width / 2 - groupCenter.x;
             const relativeCenterY = bounds.y + bounds.height / 2 - groupCenter.y;
             
-            // Scale the relative position and size
             const newRelativeCenterX = relativeCenterX * scaleFactor;
             const newRelativeCenterY = relativeCenterY * scaleFactor;
             const newWidth = bounds.width * scaleFactor;
             const newHeight = bounds.height * scaleFactor;
             
-            // Calculate new absolute position
             const newX = groupCenter.x + newRelativeCenterX - newWidth / 2;
             const newY = groupCenter.y + newRelativeCenterY - newHeight / 2;
             
@@ -1140,31 +1085,21 @@ class InteractionManager {
             newBounds.set(element, elementBounds);
         });
         
-        // Apply boundary constraints to the entire group
         const constrainedBounds = this.constrainGroupToCanvas(newBounds);
         
-        // Apply new bounds to all group members
         constrainedBounds.forEach((bounds, element) => {
             this.applyElementResize(element, bounds);
         });
     }
     
-    /**
-     * Apply resize to individual element within group
-     * @param {HTMLElement} element - Element to resize
-     * @param {Object} newBounds - New bounds {x, y, width, height}
-     */
     applyElementResize(element, newBounds) {
-        // Try to apply as bubble first
         const bubbleData = this.bubbleManager?.getBubbleData(element);
         if (bubbleData) {
-            // Update bubble data
             bubbleData.x = newBounds.x;
             bubbleData.y = newBounds.y;
             bubbleData.width = newBounds.width;
             bubbleData.height = newBounds.height;
             
-            // Update element styles
             Object.assign(element.style, {
                 left: newBounds.x + 'px',
                 top: newBounds.y + 'px',
@@ -1172,7 +1107,6 @@ class InteractionManager {
                 height: newBounds.height + 'px'
             });
             
-            // Apply deformation if needed
             if (bubbleData.isDeformed || bubbleData.flipX || bubbleData.flipY) {
                 this.controlPointManager.applyDeformationToBubble(element, bubbleData);
             }
@@ -1180,36 +1114,26 @@ class InteractionManager {
             return;
         }
         
-        // Try to apply as text element
         const textElementManager = window.editor?.textElementManager;
         if (textElementManager) {
             const textData = textElementManager.getTextDataByElement(element);
             if (textData) {
-                // For text elements, scale position but keep font size for now
-                // Future enhancement could scale font size proportionally
                 textElementManager.updateTextElementPosition(element, newBounds.x, newBounds.y);
                 return;
             }
         }
         
-        // Fallback: update element style directly
         Object.assign(element.style, {
             left: newBounds.x + 'px',
             top: newBounds.y + 'px'
         });
     }
     
-    /**
-     * Apply boundary constraints to group during transformation
-     * @param {Map} elementBounds - Map of element to bounds
-     * @returns {Map} - Constrained bounds
-     */
     constrainGroupToCanvas(elementBounds) {
         if (!elementBounds || elementBounds.size === 0) {
             return elementBounds;
         }
         
-        // Find the overall bounds of the transformed group
         let minX = Infinity;
         let minY = Infinity;
         let maxX = -Infinity;
@@ -1222,32 +1146,24 @@ class InteractionManager {
             maxY = Math.max(maxY, bounds.y + bounds.height);
         });
         
-        // Calculate how much the group exceeds canvas boundaries
         const canvasWidth = this.canvasContainer.offsetWidth;
         const canvasHeight = this.canvasContainer.offsetHeight;
         
         let offsetX = 0;
         let offsetY = 0;
         
-        // Check left boundary
         if (minX < 0) {
             offsetX = -minX;
-        }
-        // Check right boundary
-        else if (maxX > canvasWidth) {
+        } else if (maxX > canvasWidth) {
             offsetX = canvasWidth - maxX;
         }
         
-        // Check top boundary
         if (minY < 0) {
             offsetY = -minY;
-        }
-        // Check bottom boundary
-        else if (maxY > canvasHeight) {
+        } else if (maxY > canvasHeight) {
             offsetY = canvasHeight - maxY;
         }
         
-        // Apply offset to all elements if needed
         if (offsetX !== 0 || offsetY !== 0) {
             const constrainedBounds = new Map();
             elementBounds.forEach((bounds, element) => {
@@ -1264,19 +1180,15 @@ class InteractionManager {
         return elementBounds;
     }
     
-    // ===== ROTATION MOVE - WILL BE ENHANCED IN NEXT INCREMENT =====
+    // ===== ROTATION MOVE =====
     
     handleRotationMove(event) {
         event.preventDefault();
         
-        // TODO: Phase 4 - Increment 3 will add group rotation logic here
-        // For now, handle individual rotation only
         if (this.isGroupRotation) {
             console.log('Group rotation move - placeholder for Increment 3');
-            // Placeholder: Individual rotation behavior for now
         }
         
-        // Existing individual rotation logic
         const containerRect = this.canvasContainer.getBoundingClientRect();
         
         const currentAngle = Math.atan2(
@@ -1289,28 +1201,23 @@ class InteractionManager {
         
         newRotation = ((newRotation % 360) + 360) % 360;
         
-        // Get bubble data to check if deformed or flipped
         const bubbleData = this.bubbleManager.getBubbleData(this.rotationBubble);
         if (bubbleData) {
-            // Update rotation in data
             bubbleData.rotation = newRotation;
             
             if (bubbleData.isDeformed || bubbleData.flipX || bubbleData.flipY) {
-                // If deformed or flipped, let ControlPointManager handle the combined transform
                 this.controlPointManager.applyDeformationToBubble(this.rotationBubble, bubbleData);
             } else {
-                // If not deformed or flipped, apply rotation directly
                 this.rotationBubble.style.transform = `rotate(${newRotation}deg)`;
             }
         } else {
-            // Fallback if no bubble data
             this.rotationBubble.style.transform = `rotate(${newRotation}deg)`;
         }
         
         this.handleManager.updateHandlePositions(this.rotationBubble);
     }
     
-    // ===== MODIFIED: MOUSE UP WITH GROUP TRANSFORMATION CLEANUP (Phase 4 - Increment 1) =====
+    // ===== MOUSE UP HANDLING (UPDATED WITH SELECTION PRESERVATION) =====
     
     handleMouseUp(event) {
         if (this.isControlPointDragging) {
@@ -1331,6 +1238,12 @@ class InteractionManager {
                 this.deformationThrottle = null;
             }
             
+            // FIXED: Restore selection state after control point operation
+            // Add small delay to ensure all cleanup is complete before restoring selection
+            setTimeout(() => {
+                this.restoreSelectionStateAfterControlPoint();
+            }, 10);
+            
             this.isControlPointDragging = false;
             this.controlPointBubble = null;
             this.controlPointDirection = null;
@@ -1338,28 +1251,35 @@ class InteractionManager {
         }
         
         if (this.isDragging) {
-            // Handle group drag cleanup
+            // Clean up dragging state flag
+            if (this.draggedElement) {
+                this.draggedElement.removeAttribute('data-dragging');
+            }
+            
             if (this.isGroupDrag) {
                 this.cleanupGroupDrag();
             } else {
-                // Individual bubble cleanup
-                if (this.draggedBubble) {
-                    this.draggedBubble.style.opacity = '1';
-                    this.draggedBubble.style.zIndex = Constants.BUBBLE_Z_INDEX;
+                if (this.draggedElement) {
+                    this.draggedElement.style.opacity = '1';
+                    // Reset z-index based on element type
+                    const bubbleData = this.bubbleManager?.getBubbleData(this.draggedElement);
+                    if (bubbleData) {
+                        this.draggedElement.style.zIndex = Constants.BUBBLE_Z_INDEX;
+                    } else {
+                        this.draggedElement.style.zIndex = '50'; // Text z-index
+                    }
                 }
             }
             
             this.isDragging = false;
-            this.draggedBubble = null;
+            this.draggedElement = null;
             this.dragOffset = { x: 0, y: 0 };
         }
         
         if (this.isResizing) {
-            // NEW: Clean up group resize state
             if (this.isGroupResize) {
                 this.cleanupGroupTransformationState();
             } else {
-                // Individual resize cleanup
                 if (this.resizeBubble) {
                     this.resizeBubble.style.opacity = '1';
                 }
@@ -1372,11 +1292,9 @@ class InteractionManager {
         }
         
         if (this.isRotating) {
-            // NEW: Clean up group rotation state
             if (this.isGroupRotation) {
                 this.cleanupGroupTransformationState();
             } else {
-                // Individual rotation cleanup
                 if (this.rotationBubble) {
                     this.rotationBubble.style.opacity = '1';
                 }
@@ -1388,10 +1306,9 @@ class InteractionManager {
         }
     }
     
-    // ===== KEYBOARD HANDLING (unchanged) =====
+    // ===== KEYBOARD HANDLING =====
     
     handleKeyDown(event) {
-        // DON'T PROCESS SHORTCUTS IF USER IS TYPING
         const isTyping = event.target.tagName === 'INPUT' || 
                         event.target.tagName === 'TEXTAREA' ||
                         event.target.isContentEditable ||
@@ -1399,6 +1316,10 @@ class InteractionManager {
         
         if (isTyping) {
             if (event.key === 'Escape') {
+                // Add escape handling for control point operations
+                if (this.isControlPointDragging) {
+                    this.cancelControlPointOperation();
+                }
                 return;
             }
             return;
@@ -1406,7 +1327,6 @@ class InteractionManager {
         
         const selectedBubble = this.bubbleManager.getSelectedBubble();
         
-        // Always intercept Ctrl+R to prevent page refresh
         if (event.ctrlKey && (event.key === 'r' || event.key === 'R' || event.code === 'KeyR')) {
             event.preventDefault();
             event.stopPropagation();
@@ -1418,7 +1338,6 @@ class InteractionManager {
             return;
         }
         
-        // Text shortcuts
         if (event.ctrlKey && (event.key === 't' || event.key === 'T') && !event.altKey) {
             event.preventDefault();
             window.editor?.addTextElement();
@@ -1437,7 +1356,6 @@ class InteractionManager {
             return;
         }
         
-        // Flip shortcuts
         if ((event.key === 'h' || event.key === 'H') && selectedBubble && !event.ctrlKey && !event.altKey) {
             event.preventDefault();
             window.editor?.flipSelectedBubbleHorizontal() || this.bubbleManager.flipBubbleHorizontal(selectedBubble);
@@ -1452,7 +1370,6 @@ class InteractionManager {
             return;
         }
         
-        // Delete key
         if (event.key === 'Delete') {
             event.preventDefault();
             
@@ -1470,7 +1387,14 @@ class InteractionManager {
             return;
         }
         
-        // Ctrl+D - Copy
+        if (event.key === 'Escape') {
+            // Handle escape key for control point operations
+            if (this.isControlPointDragging) {
+                this.cancelControlPointOperation();
+            }
+            return;
+        }
+        
         if (event.ctrlKey && event.key === 'd') {
             event.preventDefault();
             event.stopPropagation();
@@ -1488,6 +1412,36 @@ class InteractionManager {
             }
             return;
         }
+    }
+    
+    /**
+     * Cancel control point operation (e.g., on Escape key)
+     */
+    cancelControlPointOperation() {
+        if (!this.isControlPointDragging) return;
+        
+        console.log('Cancelling control point operation');
+        
+        // Clean up visual state
+        if (this.controlPointBubble && this.controlPointDirection) {
+            const handle = this.controlPointBubble.controlPointHandles?.querySelector(`.control-point-${this.controlPointDirection}`);
+            this.setControlPointDragVisualState(false, handle);
+        }
+        
+        // Clean up throttled operations
+        if (this.deformationThrottle) {
+            cancelAnimationFrame(this.deformationThrottle);
+            this.deformationThrottle = null;
+        }
+        
+        // Restore selection state
+        this.restoreSelectionStateAfterControlPoint();
+        
+        // Reset control point state
+        this.isControlPointDragging = false;
+        this.controlPointBubble = null;
+        this.controlPointDirection = null;
+        this.controlPointStartData = null;
     }
     
     setControlPointDragVisualState(isDragging, handle) {

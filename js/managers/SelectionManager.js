@@ -1,5 +1,5 @@
 /**
- * SelectionManager - Unified selection system with comprehensive grouping functionality (FIXED Multi-selection Visual Feedback)
+ * SelectionManager - Unified selection system (FIXED: Text highlighting with border outline)
  */
 class SelectionManager {
     constructor() {
@@ -39,11 +39,26 @@ class SelectionManager {
     }
     
     /**
-     * Handle element click for selection (group behavior and Ctrl+click)
+     * Handle element click for selection (FIXED: Prevents interference during drag)
      * @param {HTMLElement} element - Clicked element
      * @param {Event} event - Click event
      */
     handleElementClick(element, event) {
+        /*
+        LOGIC PLAN:
+        1. Check if element is being dragged (data-dragging attribute)
+        2. If dragging, skip all selection updates to prevent interference
+        3. Don't select if clicking on handles or controls
+        4. Handle group selection logic
+        5. Handle multi-selection with Ctrl+click
+        6. Handle single selection
+        */
+        
+        // FIXED: Skip selection updates if element is being dragged
+        if (element.hasAttribute('data-dragging')) {
+            return;
+        }
+        
         // Don't select if clicking on handles or controls
         if (event.target.classList.contains('resize-handle') || 
             event.target.classList.contains('rotation-handle') ||
@@ -93,20 +108,30 @@ class SelectionManager {
     }
     
     /**
-     * Add element to selection (FIXED to update all selection visuals)
+     * Add element to selection (FIXED: Skip visual updates during drag)
      * @param {HTMLElement} element 
      * @param {string} type 
      * @param {Object} data 
      */
     addToSelection(element, type, data) {
+        /*
+        LOGIC PLAN:
+        1. Check if element is being dragged
+        2. Add to selection data regardless
+        3. Skip visual updates if dragging to prevent interference
+        4. Update visuals only when not dragging
+        5. Notify UI of selection change
+        */
+        
         if (!element) return false;
         
         const selectionItem = { element, type, data };
         this.selectedElements.set(element, selectionItem);
         
-        // FIXED: Update visual highlighting for ALL selected elements
-        // This ensures multi-selection indicators appear correctly
-        this.refreshAllSelectionVisuals();
+        // FIXED: Skip visual updates if any element is being dragged
+        if (!this.isDragInProgress()) {
+            this.refreshAllSelectionVisuals();
+        }
         
         // Notify UI of selection change
         this.notifySelectionChange();
@@ -115,16 +140,27 @@ class SelectionManager {
     }
     
     /**
-     * Remove element from selection (FIXED to update all selection visuals)
+     * Remove element from selection (FIXED: Skip visual updates during drag)
      * @param {HTMLElement} element 
      */
     removeFromSelection(element) {
+        /*
+        LOGIC PLAN:
+        1. Check if element exists in selection
+        2. Remove from selection data
+        3. Skip visual updates if dragging to prevent interference
+        4. Update visuals only when not dragging
+        5. Notify UI of selection change
+        */
+        
         if (!this.selectedElements.has(element)) return false;
         
         this.selectedElements.delete(element);
         
-        // FIXED: Update visual highlighting for ALL remaining selected elements
-        this.refreshAllSelectionVisuals();
+        // FIXED: Skip visual updates if any element is being dragged
+        if (!this.isDragInProgress()) {
+            this.refreshAllSelectionVisuals();
+        }
         
         // Notify UI of selection change
         this.notifySelectionChange();
@@ -133,10 +169,30 @@ class SelectionManager {
     }
     
     /**
-     * NEW: Refresh visual highlighting for all selected elements
-     * This ensures proper multi-selection and group indicators
+     * NEW: Check if any element is currently being dragged
+     * @returns {boolean}
+     */
+    isDragInProgress() {
+        // Check if any element in the document has the dragging attribute
+        return document.querySelector('[data-dragging="true"]') !== null;
+    }
+    
+    /**
+     * Refresh visual highlighting for all selected elements (FIXED: Skip during drag)
      */
     refreshAllSelectionVisuals() {
+        /*
+        LOGIC PLAN:
+        1. Check if drag is in progress - if so, skip entirely
+        2. Clear all current highlighting 
+        3. Re-apply highlighting with correct multi-selection state
+        */
+        
+        // FIXED: Skip visual updates during drag
+        if (this.isDragInProgress()) {
+            return;
+        }
+        
         // First, clear all highlighting
         this.selectedElements.forEach((selectionItem, element) => {
             this.unhighlightElement(element, selectionItem.type);
@@ -440,14 +496,24 @@ class SelectionManager {
     }
     
     /**
-     * Apply visual highlighting to selected element (ENHANCED with FIXED multi-selection indicators)
+     * Apply visual highlighting to selected element (FIXED: Border-based text highlighting)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
     highlightElement(element, type) {
+        /*
+        LOGIC PLAN:
+        1. Add generic 'selected' class to element
+        2. Determine selection state (individual, multi-selection, grouped)
+        3. Apply appropriate highlighting based on type and state
+        4. For text individual selection: use dashed border outline (NOT background)
+        5. For text multi/grouped selection: use boxShadow system
+        6. For bubbles: maintain existing behavior with bubble manager integration
+        */
+        
         element.classList.add('selected');
         
-        // FIXED: Check multi-selection state based on CURRENT selection size
+        // Check multi-selection state based on CURRENT selection size
         const isMultiSelection = this.selectedElements.size > 1;
         const isGrouped = this.isElementGrouped(element);
         
@@ -460,7 +526,7 @@ class SelectionManager {
                 member.style.transition = 'box-shadow 0.2s ease';
             });
         } else if (isMultiSelection) {
-            // FIXED: For multi-selection, use blue indicators for all selected elements
+            // For multi-selection, use blue indicators for all selected elements
             element.style.boxShadow = '0 0 0 3px #2196F3, 0 0 8px rgba(33, 150, 243, 0.6)';
             element.style.transition = 'box-shadow 0.2s ease';
         }
@@ -482,31 +548,41 @@ class SelectionManager {
                 }
             }
         } else if (type === 'text') {
-            // Enhanced text element highlighting
+            // FIXED: Border-based text element highlighting (bigger, green, solid)
             if (!isGrouped && !isMultiSelection) {
-                // Single text selection
-                element.style.background = 'rgba(33, 150, 243, 0.1)';
+                // Single text selection: use solid green border outline
+                element.style.border = '3px solid #4CAF50';
                 element.style.borderRadius = '4px';
                 element.style.transition = 'all 0.2s ease';
+                // Removed: element.style.background - no background color
             }
             // Multi-selection and grouped styling handled by boxShadow above
         }
     }
     
     /**
-     * Remove visual highlighting from element (ENHANCED cleanup)
+     * Remove visual highlighting from element (FIXED: Updated border cleanup)
      * @param {HTMLElement} element 
      * @param {string} type 
      */
     unhighlightElement(element, type) {
+        /*
+        LOGIC PLAN:
+        1. Remove generic 'selected' class
+        2. Clean up all possible visual indicators including new border styling
+        3. Handle type-specific cleanup (bubble manager deselection)
+        4. Clean up group selection indicators if no group members remain selected
+        */
+        
         element.classList.remove('selected');
         
-        // Clean up all visual indicators
+        // Clean up all visual indicators (FIXED: Added border cleanup)
         element.style.boxShadow = '';
         element.style.borderRadius = '';
         element.style.transition = '';
         element.style.background = '';
         element.style.borderColor = '';
+        element.style.border = ''; // FIXED: Added border cleanup for text elements
         
         // Type-specific cleanup
         if (type === 'bubble') {
