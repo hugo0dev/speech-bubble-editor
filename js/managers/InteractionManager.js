@@ -431,18 +431,187 @@ class InteractionManager {
             return;
         }
         
-        // Update dragged element position first
-        this.updateElementPosition(this.draggedElement, newDraggedX, newDraggedY);
+        // STEP 2: Apply group-aware boundary constraints
+        const constrainedPos = this.calculateGroupBoundaryConstraints(
+            this.draggedElement, newDraggedX, newDraggedY
+        );
         
-        // Update other group members using relative offsets
+        // Update dragged element to constrained position that maintains group integrity
+        this.updateElementPosition(this.draggedElement, constrainedPos.constrainedX, constrainedPos.constrainedY);
+        
+        // Update other group members using exact relative offsets from constrained position
+        // No individual constraints needed since group constraint already applied
         this.relativeOffsets.forEach((offset, member) => {
-            const newX = newDraggedX + offset.x;
-            const newY = newDraggedY + offset.y;
+            const newX = constrainedPos.constrainedX + offset.x;
+            const newY = constrainedPos.constrainedY + offset.y;
             
-            // Apply boundary constraints
-            const constrainedPos = this.constrainToCanvas(member, newX, newY);
-            this.updateElementPosition(member, constrainedPos.x, constrainedPos.y);
+            // Direct position update without individual constraints
+            this.updateElementPosition(member, newX, newY);
         });
+    }
+
+    /**
+     * STEP 1: Calculate group-aware boundary constraints
+     * Ensures entire group stays within canvas when dragged element moves to new position
+     * @param {HTMLElement} draggedElement - The element being actively dragged
+     * @param {number} newDraggedX - Proposed new X position for dragged element
+     * @param {number} newDraggedY - Proposed new Y position for dragged element
+     * @returns {Object} - {constrainedX, constrainedY} safe position for dragged element
+     */
+    calculateGroupBoundaryConstraints(draggedElement, newDraggedX, newDraggedY) {
+        // Get current position of dragged element for calculating movement delta
+        const currentDraggedPos = this.getElementPosition(draggedElement);
+        if (!currentDraggedPos) {
+            return { constrainedX: newDraggedX, constrainedY: newDraggedY };
+        }
+        
+        // Calculate proposed movement delta
+        const proposedDeltaX = newDraggedX - currentDraggedPos.x;
+        const proposedDeltaY = newDraggedY - currentDraggedPos.y;
+        
+        // Calculate proposed positions for all group members
+        const groupMemberPositions = [];
+        
+        // Add dragged element position
+        groupMemberPositions.push({
+            element: draggedElement,
+            proposedX: newDraggedX,
+            proposedY: newDraggedY
+        });
+        
+        // Add other group member positions using relative offsets
+        this.relativeOffsets.forEach((offset, member) => {
+            groupMemberPositions.push({
+                element: member,
+                proposedX: newDraggedX + offset.x,
+                proposedY: newDraggedY + offset.y
+            });
+        });
+        
+        // STEP 4: Find movement limits that keep entire group within bounds
+        const movementLimits = this.findGroupMovementLimits(groupMemberPositions);
+        
+        // STEP 5: Apply group constraints to dragged element movement
+        return this.applyGroupConstraints(
+            currentDraggedPos.x, currentDraggedPos.y,
+            newDraggedX, newDraggedY,
+            movementLimits.maxDeltaX, movementLimits.maxDeltaY
+        );
+    }
+    
+    /**
+     * STEP 3: Calculate boundary limits for individual element
+     * @param {HTMLElement} element - Element to check
+     * @param {number} proposedX - Proposed X position
+     * @param {number} proposedY - Proposed Y position
+     * @returns {Object} - Boundary violation amounts
+     */
+    calculateElementBoundaryLimits(element, proposedX, proposedY) {
+        const elementWidth = element.offsetWidth || 50;
+        const elementHeight = element.offsetHeight || 50;
+        const canvasWidth = this.canvasContainer.offsetWidth;
+        const canvasHeight = this.canvasContainer.offsetHeight;
+        
+        // Calculate how much element would exceed boundaries
+        const excessLeft = Math.max(0, -proposedX);
+        const excessRight = Math.max(0, (proposedX + elementWidth) - canvasWidth);
+        const excessTop = Math.max(0, -proposedY);
+        const excessBottom = Math.max(0, (proposedY + elementHeight) - canvasHeight);
+        
+        return {
+            excessLeft,
+            excessRight, 
+            excessTop,
+            excessBottom
+        };
+    }
+    
+    /**
+     * STEP 4: Find maximum safe movement for entire group
+     * @param {Array} groupMemberPositions - Array of {element, proposedX, proposedY}
+     * @returns {Object} - {maxDeltaX, maxDeltaY} maximum safe movement
+     */
+    findGroupMovementLimits(groupMemberPositions) {
+        let maxAllowedLeft = Infinity;
+        let maxAllowedRight = Infinity;
+        let maxAllowedUp = Infinity;
+        let maxAllowedDown = Infinity;
+        
+        // Check boundary violations for each group member
+        groupMemberPositions.forEach(memberPos => {
+            const limits = this.calculateElementBoundaryLimits(
+                memberPos.element, 
+                memberPos.proposedX, 
+                memberPos.proposedY
+            );
+            
+            // Track the most restrictive constraints across all members
+            maxAllowedLeft = Math.min(maxAllowedLeft, limits.excessLeft);
+            maxAllowedRight = Math.min(maxAllowedRight, limits.excessRight);
+            maxAllowedUp = Math.min(maxAllowedUp, limits.excessTop);
+            maxAllowedDown = Math.min(maxAllowedDown, limits.excessBottom);
+        });
+        
+        // Convert boundary violations to movement limits
+        // If any element would exceed boundary, reduce allowed movement accordingly
+        const canvasWidth = this.canvasContainer.offsetWidth;
+        const canvasHeight = this.canvasContainer.offsetHeight;
+        
+        const maxDeltaX = Math.min(
+            canvasWidth,  // Fallback maximum
+            maxAllowedLeft === 0 ? Infinity : maxAllowedLeft,
+            maxAllowedRight === 0 ? Infinity : maxAllowedRight
+        );
+        
+        const maxDeltaY = Math.min(
+            canvasHeight, // Fallback maximum  
+            maxAllowedUp === 0 ? Infinity : maxAllowedUp,
+            maxAllowedDown === 0 ? Infinity : maxAllowedDown
+        );
+        
+        return {
+            maxDeltaX: maxDeltaX === Infinity ? canvasWidth : maxDeltaX,
+            maxDeltaY: maxDeltaY === Infinity ? canvasHeight : maxDeltaY
+        };
+    }
+    
+    /**
+     * STEP 5: Apply calculated constraints to dragged element movement
+     * @param {number} originalX - Original X position of dragged element
+     * @param {number} originalY - Original Y position of dragged element  
+     * @param {number} proposedX - Proposed new X position
+     * @param {number} proposedY - Proposed new Y position
+     * @param {number} maxDeltaX - Maximum allowed X movement
+     * @param {number} maxDeltaY - Maximum allowed Y movement
+     * @returns {Object} - {constrainedX, constrainedY} final safe position
+     */
+    applyGroupConstraints(originalX, originalY, proposedX, proposedY, maxDeltaX, maxDeltaY) {
+        // Calculate intended movement
+        const intendedDeltaX = proposedX - originalX;
+        const intendedDeltaY = proposedY - originalY;
+        
+        // Apply movement constraints
+        const constrainedDeltaX = this.clampMovement(intendedDeltaX, maxDeltaX);
+        const constrainedDeltaY = this.clampMovement(intendedDeltaY, maxDeltaY);
+        
+        // Calculate final constrained position
+        return {
+            constrainedX: originalX + constrainedDeltaX,
+            constrainedY: originalY + constrainedDeltaY
+        };
+    }
+    
+    /**
+     * Helper: Clamp movement delta to allowed range
+     * @param {number} intendedDelta - Intended movement amount
+     * @param {number} maxDelta - Maximum allowed movement
+     * @returns {number} - Clamped movement amount
+     */
+    clampMovement(intendedDelta, maxDelta) {
+        if (maxDelta === Infinity) {
+            return intendedDelta;
+        }
+        return Math.max(-maxDelta, Math.min(maxDelta, intendedDelta));
     }
     
     updateElementPosition(element, newX, newY) {
