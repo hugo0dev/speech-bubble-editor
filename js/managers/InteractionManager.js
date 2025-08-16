@@ -1,5 +1,5 @@
 /**
- * InteractionManager - Handles user interactions (FIXED: Control Point Selection Preservation)
+ * InteractionManager - Handles user interactions (FIXED: Group Boundary Collision Detection)
  */
 class InteractionManager {
     constructor(canvasContainer, bubbleManager, handleManager, controlPointManager) {
@@ -451,134 +451,85 @@ class InteractionManager {
     }
     
     updateGroupPositions(newDraggedX, newDraggedY) {
+        /*
+        LOGIC PLAN:
+        1. Check if we're in group drag mode
+        2. Calculate the current group's collective bounding box
+        3. Calculate proposed new group bounding box based on drag movement
+        4. Check if proposed bounding box exceeds canvas boundaries  
+        5. If so, constrain the movement to keep entire group within bounds
+        6. Apply the constrained movement to all group members
+        */
+        
         if (!this.isGroupDrag || !this.draggedElement) {
             return;
         }
         
-        const constrainedPos = this.calculateGroupBoundaryConstraints(
-            this.draggedElement, newDraggedX, newDraggedY
-        );
+        // Get current position of dragged element
+        const currentDraggedPos = this.getElementPosition(this.draggedElement);
+        if (!currentDraggedPos) {
+            return;
+        }
         
-        this.updateElementPosition(this.draggedElement, constrainedPos.constrainedX, constrainedPos.constrainedY);
+        // Calculate movement delta
+        const deltaX = newDraggedX - currentDraggedPos.x;
+        const deltaY = newDraggedY - currentDraggedPos.y;
         
+        // Calculate current group bounding box
+        const currentGroupBounds = this.calculateGroupBounds(this.groupMembers);
+        if (!currentGroupBounds) {
+            return;
+        }
+        
+        // Calculate proposed new group bounding box
+        const proposedGroupBounds = {
+            x: currentGroupBounds.x + deltaX,
+            y: currentGroupBounds.y + deltaY,
+            width: currentGroupBounds.width,
+            height: currentGroupBounds.height
+        };
+        
+        // Check canvas boundaries and constrain if needed
+        const canvasWidth = this.canvasContainer.offsetWidth;
+        const canvasHeight = this.canvasContainer.offsetHeight;
+        
+        let constrainedDeltaX = deltaX;
+        let constrainedDeltaY = deltaY;
+        
+        // Left boundary check
+        if (proposedGroupBounds.x < 0) {
+            constrainedDeltaX = deltaX - proposedGroupBounds.x; // Adjust to keep left edge at 0
+        }
+        
+        // Right boundary check  
+        if (proposedGroupBounds.x + proposedGroupBounds.width > canvasWidth) {
+            const excess = (proposedGroupBounds.x + proposedGroupBounds.width) - canvasWidth;
+            constrainedDeltaX = deltaX - excess; // Adjust to keep right edge within canvas
+        }
+        
+        // Top boundary check
+        if (proposedGroupBounds.y < 0) {
+            constrainedDeltaY = deltaY - proposedGroupBounds.y; // Adjust to keep top edge at 0
+        }
+        
+        // Bottom boundary check
+        if (proposedGroupBounds.y + proposedGroupBounds.height > canvasHeight) {
+            const excess = (proposedGroupBounds.y + proposedGroupBounds.height) - canvasHeight;
+            constrainedDeltaY = deltaY - excess; // Adjust to keep bottom edge within canvas
+        }
+        
+        // Apply constrained movement to dragged element
+        const constrainedDraggedX = currentDraggedPos.x + constrainedDeltaX;
+        const constrainedDraggedY = currentDraggedPos.y + constrainedDeltaY;
+        
+        this.updateElementPosition(this.draggedElement, constrainedDraggedX, constrainedDraggedY);
+        
+        // Apply constrained movement to all other group members
         this.relativeOffsets.forEach((offset, member) => {
-            const newX = constrainedPos.constrainedX + offset.x;
-            const newY = constrainedPos.constrainedY + offset.y;
+            const newX = constrainedDraggedX + offset.x;
+            const newY = constrainedDraggedY + offset.y;
             this.updateElementPosition(member, newX, newY);
         });
-    }
-
-    calculateGroupBoundaryConstraints(draggedElement, newDraggedX, newDraggedY) {
-        const currentDraggedPos = this.getElementPosition(draggedElement);
-        if (!currentDraggedPos) {
-            return { constrainedX: newDraggedX, constrainedY: newDraggedY };
-        }
-        
-        const proposedDeltaX = newDraggedX - currentDraggedPos.x;
-        const proposedDeltaY = newDraggedY - currentDraggedPos.y;
-        
-        const groupMemberPositions = [];
-        
-        groupMemberPositions.push({
-            element: draggedElement,
-            proposedX: newDraggedX,
-            proposedY: newDraggedY
-        });
-        
-        this.relativeOffsets.forEach((offset, member) => {
-            groupMemberPositions.push({
-                element: member,
-                proposedX: newDraggedX + offset.x,
-                proposedY: newDraggedY + offset.y
-            });
-        });
-        
-        const movementLimits = this.findGroupMovementLimits(groupMemberPositions);
-        
-        return this.applyGroupConstraints(
-            currentDraggedPos.x, currentDraggedPos.y,
-            newDraggedX, newDraggedY,
-            movementLimits.maxDeltaX, movementLimits.maxDeltaY
-        );
-    }
-    
-    calculateElementBoundaryLimits(element, proposedX, proposedY) {
-        const elementWidth = element.offsetWidth || 50;
-        const elementHeight = element.offsetHeight || 50;
-        const canvasWidth = this.canvasContainer.offsetWidth;
-        const canvasHeight = this.canvasContainer.offsetHeight;
-        
-        const excessLeft = Math.max(0, -proposedX);
-        const excessRight = Math.max(0, (proposedX + elementWidth) - canvasWidth);
-        const excessTop = Math.max(0, -proposedY);
-        const excessBottom = Math.max(0, (proposedY + elementHeight) - canvasHeight);
-        
-        return {
-            excessLeft,
-            excessRight, 
-            excessTop,
-            excessBottom
-        };
-    }
-    
-    findGroupMovementLimits(groupMemberPositions) {
-        let maxAllowedLeft = Infinity;
-        let maxAllowedRight = Infinity;
-        let maxAllowedUp = Infinity;
-        let maxAllowedDown = Infinity;
-        
-        groupMemberPositions.forEach(memberPos => {
-            const limits = this.calculateElementBoundaryLimits(
-                memberPos.element, 
-                memberPos.proposedX, 
-                memberPos.proposedY
-            );
-            
-            maxAllowedLeft = Math.min(maxAllowedLeft, limits.excessLeft);
-            maxAllowedRight = Math.min(maxAllowedRight, limits.excessRight);
-            maxAllowedUp = Math.min(maxAllowedUp, limits.excessTop);
-            maxAllowedDown = Math.min(maxAllowedDown, limits.excessBottom);
-        });
-        
-        const canvasWidth = this.canvasContainer.offsetWidth;
-        const canvasHeight = this.canvasContainer.offsetHeight;
-        
-        const maxDeltaX = Math.min(
-            canvasWidth,
-            maxAllowedLeft === 0 ? Infinity : maxAllowedLeft,
-            maxAllowedRight === 0 ? Infinity : maxAllowedRight
-        );
-        
-        const maxDeltaY = Math.min(
-            canvasHeight,
-            maxAllowedUp === 0 ? Infinity : maxAllowedUp,
-            maxAllowedDown === 0 ? Infinity : maxAllowedDown
-        );
-        
-        return {
-            maxDeltaX: maxDeltaX === Infinity ? canvasWidth : maxDeltaX,
-            maxDeltaY: maxDeltaY === Infinity ? canvasHeight : maxDeltaY
-        };
-    }
-    
-    applyGroupConstraints(originalX, originalY, proposedX, proposedY, maxDeltaX, maxDeltaY) {
-        const intendedDeltaX = proposedX - originalX;
-        const intendedDeltaY = proposedY - originalY;
-        
-        const constrainedDeltaX = this.clampMovement(intendedDeltaX, maxDeltaX);
-        const constrainedDeltaY = this.clampMovement(intendedDeltaY, maxDeltaY);
-        
-        return {
-            constrainedX: originalX + constrainedDeltaX,
-            constrainedY: originalY + constrainedDeltaY
-        };
-    }
-    
-    clampMovement(intendedDelta, maxDelta) {
-        if (maxDelta === Infinity) {
-            return intendedDelta;
-        }
-        return Math.max(-maxDelta, Math.min(maxDelta, intendedDelta));
     }
     
     updateElementPosition(element, newX, newY) {
